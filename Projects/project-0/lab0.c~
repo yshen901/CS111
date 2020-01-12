@@ -1,0 +1,33 @@
+#include <stdio.h>
+#include <unistd.h>
+
+int main(int argc, char** argv) {
+  int opt;
+
+  //If the option takes a value, that value is pointer to the external variable optarg.
+  //‘?’ when there is an unrecognized option and it stores into external variable optopt.
+  //‘-1’ if there are no more options to process.
+  while((opt = getopt(argc, argv, ":if:lr")) != -1) {
+    switch(opt) {
+      case 'i':
+      case 'l':
+      case 'r':
+	printf("option: %c\n", opt);
+	break;
+      case 'f':
+	printf("filename: %s\n", optarg);
+	break;
+      case ':':
+        printf("option needs a value\n");
+        break;
+    }
+  }
+  
+  // optind is for the extra arguments 
+  // which are not parsed c
+  for(; optind < argc; optind++){
+    printf("extra arguments: %s\n", argv[optind]);
+  }
+
+  return 0;
+}
