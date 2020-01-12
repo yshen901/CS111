@@ -1,10 +1,11 @@
 #include <fcntl.h>  // open, creat, dup 
 #include <unistd.h> // close, dup, read, write, getopt
 #include <getopt.h> // getopt
-#include <stdio.h>  //
-#include <stdlib.h>
-#include <errno.h>
-#include <string.h>
+#include <stdio.h>  // fprintf
+#include <stdlib.h> // _exit
+#include <signal.h> // signal
+#include <errno.h>  // errno
+#include <string.h> // strerror
 
 int main(int argc, char** argv) {
   int c;
