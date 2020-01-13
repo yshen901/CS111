@@ -13,7 +13,7 @@
 #define CATCH 'c'
 
 void handle_error(int signum) {
-  fprintf(stderr, "SEGFAULT error caught %s\n", strerror(errno));
+  fprintf(stderr, "SEGFAULT error caught: %s\n", strerror(signum));
   _exit(4);
 }
 
