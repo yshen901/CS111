@@ -7,57 +7,95 @@
 #include <errno.h>  // errno
 #include <string.h> // strerror
 
+#define INPUT 'i'
+#define OUTPUT 'o'
+#define SEGFAULT 's'
+#define CATCH 'c'
+
+void handle_error(int signum) {
+  fprintf(stderr, "SEGFAULT error caught %s\n", strerror(errno));
+  _exit(4);
+}
+
 int main(int argc, char** argv) {
+
   int c;
   int option_index = 0;
-
+  int segfault = 0;
   int fd0, fd1;
-
+  
   struct option long_options[] = {
-    {"input", required_argument, NULL, 'i'},
-    {"output", required_argument, NULL, 'o'},
-    {"segfault", no_argument, NULL, 's'},
-    {"catch", no_argument, NULL, 'c'},
+    {"input", required_argument, &c, INPUT}, // use #define INPUT 'i' to set an alias
+    {"output", required_argument, &c, OUTPUT},
+    {"segfault", no_argument, &c, SEGFAULT},
+    {"catch", no_argument, &c, CATCH},
     {0, 0, 0, 0}
   };
 
-  while(1) {
-    c = getopt_long(argc, argv, "", long_options, &option_index);
-    if (c == -1) break; //returns -1 if out of options
-
+  // handling options and redirection
+  while(getopt_long(argc, argv, "", long_options, &option_index) != -1) {
     switch(c) {
-      case 0:
-	printf("All options parsed");
+      case 0: // What is this used for in the example?
 	break;
-      case 'i':
-	printf("Option %s with argument %s\n", long_options[option_index].name, optarg);
+      case INPUT:
 	fd0 = open(optarg, O_RDONLY);
 	if(fd0 >= 0){
 	  close(0);
 	  dup(fd0);
 	  close(fd0);
 	} else {
-	  fprintf(stdout, "Failed with error code %s\n", strerror(errno));
+	  fprintf(stderr, "Error opening input file: %s\n", strerror(errno));
 	  _exit(2);
 	}
 	break;
-      case 'o':
-	printf("Option %s with argument %s\n", long_options[option_index].name, optarg);
+      case OUTPUT:
+	//fd1 = creat(optarg, 0666); // 0666 specifies r+w permissions for user, group, and other
+	fd1 = open(optarg, O_RDWR | O_CREAT, 0666); // Same as above, but not having O_RDWR will cause a bad file-descriptor error
+	if (fd1 >= 0) {
+	  dup2(fd1, 1); // NOTE: Same as close -> dup -> close
+	} else {
+	  fprintf(stderr, "Error opening/creating output file: %s\n", strerror(errno)); // prints to specific file-descriptor
+	  _exit(3);
+	}
 	break;
-      case 's':
-        printf("Option %s", long_options[option_index].name);
+      case SEGFAULT:
+	segfault = 1;
 	break;
-      case 'c':
-	printf("Option %s", long_options[option_index].name);
+      case CATCH:
+	signal(SIGSEGV, handle_error);
 	break;
       case '?':
-	printf("Foreign option...skipped\n");
-	break;
       default:
-	printf("Unknown option detected with code %c\n", c);
-	break;
+	printf("Unknown option detected, please use the following supported options: ");
+	printf("--input=filename, --output=filename, --segfault, and --catch\n");
+	_exit(1);
     }
   }
 
-  return 0;
+  // trigger segfault
+  if (segfault == 1) {
+    char* p = NULL;
+    *p = 'A';
+  }
+
+  // reading/writing the information
+  int temp;
+  char* buff;
+  while(1) {
+    temp = read(0, &buff, sizeof(char));
+    
+    if (temp == 0) break;
+    if (temp == -1) {
+      fprintf(stderr, "Error reading from file: %s\n", strerror(errno));
+      _exit(-1);
+    }
+
+    temp = write(1, &buff, sizeof(char));
+    if (temp == -1) {
+      fprintf(stderr, "Error writing to file: %s\n", strerror(errno));
+      _exit(-1);
+    }
+  }
+
+  exit(0);
 }
