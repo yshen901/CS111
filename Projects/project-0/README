@@ -1,0 +1,22 @@
+NAME: YUCI SHEN
+EMAIL: SHEN.YUCI11@GMAIL.COM
+ID: 604836772
+SLIPDAYS: 0
+
+FILES INCLUDED:
+     1) lab0.c		: Source code
+     2) Makefile	: Supports build (default), check, clean, and dist
+     3) backtrace.png	: Screenshot of the backtrace after segfault crash in gdb
+     4) breakpoint.png	: Screenshot of the pointer value before the crash in gdb
+     5) README		: Detailed information on the project
+
+SMOKE-TESTS:
+     a) Read/write, input redirection, output redirection, and input+output redirection
+          - Compare the input and output files using diff, and check for exit code 0.
+     b) Segfault trigger
+       	  - Check for exit code 139 after triggering segfault
+     c) Segfault catch, wrong argument, wrong input, and wrong output
+     	  - Check for exit codes 4, 1, 2, and 3 respectively
+
+REFERENCES:
+     Stack overflow, Linux MAN pages, and discussion notes.

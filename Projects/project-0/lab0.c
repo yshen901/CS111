@@ -1,3 +1,9 @@
+/*
+  NAME : YUCI SHEN
+  EMAIL: SHEN.YUCI11@GMAIL.COM
+  ID   : 604836772
+*/
+
 #include <fcntl.h>  // open, creat, dup 
 #include <unistd.h> // close, dup, read, write, getopt
 #include <getopt.h> // getopt
@@ -13,8 +19,8 @@
 #define CATCH 'c'
 
 void handle_error(int signum) {
-  fprintf(stderr, "SEGFAULT error caught: %s\n", strerror(signum));
-  _exit(4);
+  fprintf(stderr, "SEGFAULT caught: signum %d (%s)\n", signum, strerror(signum));
+  exit(4);
 }
 
 int main(int argc, char** argv) {
@@ -45,7 +51,7 @@ int main(int argc, char** argv) {
 	  close(fd0);
 	} else {
 	  fprintf(stderr, "Error opening input file: %s\n", strerror(errno));
-	  _exit(2);
+	  exit(2);
 	}
 	break;
       case OUTPUT:
@@ -55,7 +61,7 @@ int main(int argc, char** argv) {
 	  dup2(fd1, 1); // NOTE: Same as close -> dup -> close
 	} else {
 	  fprintf(stderr, "Error opening/creating output file: %s\n", strerror(errno)); // prints to specific file-descriptor
-	  _exit(3);
+	  exit(3);
 	}
 	break;
       case SEGFAULT:
@@ -68,7 +74,7 @@ int main(int argc, char** argv) {
       default:
 	printf("Unknown option detected, please use the following supported options: ");
 	printf("--input=filename, --output=filename, --segfault, and --catch\n");
-	_exit(1);
+	exit(1);
     }
   }
 
@@ -87,13 +93,13 @@ int main(int argc, char** argv) {
     if (temp == 0) break;
     if (temp == -1) {
       fprintf(stderr, "Error reading from file: %s\n", strerror(errno));
-      _exit(-1);
+      exit(-1);
     }
 
     temp = write(1, &buff, sizeof(char));
     if (temp == -1) {
       fprintf(stderr, "Error writing to file: %s\n", strerror(errno));
-      _exit(-1);
+      exit(-1);
     }
   }
 
