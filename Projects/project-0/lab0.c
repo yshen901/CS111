@@ -72,8 +72,7 @@ int main(int argc, char** argv) {
 	break;
       case '?':
       default:
-	printf("Unknown option detected, please use the following supported options: ");
-	printf("--input=filename, --output=filename, --segfault, and --catch\n");
+	fprintf(stderr, "%s\nPlease use these valid options: --input=filename, --output=filename, --segfault, --catch\n", strerror(errno));
 	exit(1);
     }
   }
