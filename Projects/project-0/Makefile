@@ -74,7 +74,7 @@ check:
 		echo "FAILED : Segfault catch"; \
 	fi
 
-	@./lab0 --fakeOption 2> dump.txt ; \
+	@./lab0 --inp 2> dump.txt ; \
 	if [ $$? -eq 1 ] ; \
 	then \
 		echo "CAUGHT  : Incorrect argument error"; \
