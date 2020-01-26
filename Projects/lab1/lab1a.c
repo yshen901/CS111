@@ -73,7 +73,7 @@ void set_input_mode () {
 void shell_exit_status() {
   int status;
   waitpid(pid, &status, 0);
-  fprintf(stderr, "SHELL EXIT SIGNAL=%d STATUS=%d%s", WIFSIGNALED(status), WEXITSTATUS(status), crlf);
+  fprintf(stderr, "SHELL EXIT SIGNAL=%d STATUS=%d%s", WTERMSIG(status), WEXITSTATUS(status), crlf);
 }
 
 void sigpipe_handler() {
@@ -157,7 +157,8 @@ int main(int argc, char** argv) {
 	    }
 	    else if (c == ETX) { // ^C: kill the process
 	      write(STDOUT_FILENO, "^C", 2);
-	      kill(pid, SIGINT);
+	      if (kill(pid, SIGINT) < 0)
+		fprintf(stderr, "Kill failed.");
 	    }
 	    else if (c == CR || c == LF) {
 	      c = LF;
