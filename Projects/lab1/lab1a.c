@@ -70,6 +70,11 @@ void set_input_mode () {
   tcsetattr(STDIN_FILENO, TCSAFLUSH, &tattr);
 }
 
+void err_mess(char* message) {
+  fprintf(stderr, "%s: %s%s", message, strerror(errno), crlf);
+  exit(1);
+}
+
 void shell_exit_status() {
   int status;
   waitpid(pid, &status, 0);
@@ -106,30 +111,28 @@ int main(int argc, char** argv) {
 	break;
       case '?':
       default:
-        fprintf(stderr, "%s\n Please use these valid options: --shell\n", strerror(errno));
+        fprintf(stderr, "%s: Please use --shell or no argument\n", strerror(errno));
         exit(1);
     }
   }
 
   if (shell_flag) {
     // Make two pipes for terminal-to-shell and shell-to-terminal data flows
-    if (pipe(term_to_shell) != 0 || pipe(shell_to_term) != 0) {
-      fprintf(stderr, "Pipe failed: %s%s", strerror(errno), crlf);
-      exit(1);
-    }
+    if (pipe(term_to_shell) != 0 || pipe(shell_to_term) != 0) 
+      err_mess("Pipe failed");
 
     set_input_mode();
     signal(SIGPIPE, sigpipe_handler);
 
     // Fork to create a child process (the shell)
     pid = fork();
-    if (pid < 0) {
-      fprintf(stderr, "Fork failed: %s%s", strerror(errno), crlf);
-      exit(1);
-    }
+    if (pid < 0)
+      err_mess("Fork failed");
     else if (pid != 0) { /* Parent Process */
-      close(term_to_shell[READ]); // terminal-to-shell pipe, close the terminal's read side
-      close(shell_to_term[WRITE]); // shell-to-terminal pipe, close the terminal's write side
+      if (close(term_to_shell[READ]) < 0) // terminal-to-shell pipe, close the terminal's read side
+	err_mess("Failed to close term_to_shell[READ]");
+      if (close(shell_to_term[WRITE]) < 0) // shell-to-terminal pipe, close the terminal's write side
+	err_mess("Failed to close shell_to_term[WRITE]");
       
       struct pollfd fds[2];
       fds[0].fd = STDIN_FILENO;
@@ -138,71 +141,73 @@ int main(int argc, char** argv) {
       fds[1].events = POLLIN | POLLHUP | POLLERR;
 
       while(1) {
-	if ((poll_status = poll(fds, 2, 0)) < 0) {
-	  fprintf(stderr, "Error polling: %s%s", strerror(errno), crlf);
-	  exit(1);
-	}
+	if ((poll_status = poll(fds, 2, 0)) < 0) 
+	  err_mess("Error polling");
 
 	// Read from keyboard
 	if (fds[0].revents && fds[0].revents == POLLIN) {
-	  if ((read_status = read(fds[0].fd, &key_input, 10)) < 0) {
-	    fprintf(stderr, "Error reading from keybaord: %s%s", strerror(errno), crlf);
-	    exit(1);
-	  }
+	  if ((read_status = read(fds[0].fd, &key_input, 10)) < 0) 
+	    err_mess("Error reading from keybaord");
 	  for (int i = 0; i < read_status; i++) {
 	    c = key_input[i];
 	    if (c == EOF2 ) { // ^D: close the write side
-	      write(STDOUT_FILENO, "^D", 2);
-	      close(term_to_shell[WRITE]);
+	      if (write(STDOUT_FILENO, "^D", 2) < 0)
+		err_mess("Failed to write ^D to STDOUT");
+	      if (close(term_to_shell[WRITE]) < 0)
+		err_mess("Failed to close term_to_shell[WRITE]");
 	    }
 	    else if (c == ETX) { // ^C: kill the process
-	      write(STDOUT_FILENO, "^C", 2);
+	      if (write(STDOUT_FILENO, "^C", 2) < 0)
+		err_mess("Failed to write ^C to STDOUT");
 	      if (kill(pid, SIGINT) < 0)
 		fprintf(stderr, "Kill failed.");
 	    }
 	    else if (c == CR || c == LF) {
 	      c = LF;
-	      write(STDOUT_FILENO, crlf, 2);
-	      write(term_to_shell[WRITE], &c, 1);
+	      if (write(STDOUT_FILENO, crlf, 2) < 0)
+		err_mess("Failed to write crlf to STDOUT");
+	      if (write(term_to_shell[WRITE], &c, 1) < 0)
+		err_mess("Failed to write to term_to_shell[WRITE]");
 	    }
 	    else {
-	      write(STDOUT_FILENO, &c, 1);
-	      write(term_to_shell[WRITE], &c, 1);
+	      if (write(STDOUT_FILENO, &c, 1) < 0)
+		err_mess("Failed to write to STDOUT");
+	      if (write(term_to_shell[WRITE], &c, 1) < 0)
+		err_mess("Failed to write to term_to_shell[WRITE]");
 	    }
 	  }
 	}
-	else if (fds[0].revents && fds[0].revents == POLLERR) { // not processed
-	  fprintf(stderr, "Error polling keyboard %s%s", strerror(errno), crlf);
-	  exit(1);
-	}
-	else if (fds[0].revents && fds[0].revents == POLLHUP) { // not processed
-	  fprintf(stderr, "Peer (shell) has closed its channel: %s%s", strerror(errno), crlf);
-	  exit(1);
-	}
+	else if (fds[0].revents && fds[0].revents == POLLERR) // not processed
+	  err_mess("Error polling keyboard");
+	else if (fds[0].revents && fds[0].revents == POLLHUP) // not processed
+	  err_mess("Peer (shell) has closed its channel");
 
 	// Either read from shell, or directly exit the loop
 	if (fds[1].revents && fds[1].revents == POLLIN) {
 	  read_status = read(shell_to_term[READ], &shell_input, 256);
-	  if (read_status < 0) {
-	    fprintf(stderr, "Error reading from shell: %s%s", strerror(errno), crlf);
-	  }
+	  if (read_status < 0)
+	    err_mess("Error reading from shell");
 	  for (int i = 0; i < read_status; i++) {
 	    c = shell_input[i];
 	    if (c == EOF2) {
-	      close(shell_to_term[READ]);
+	      if(close(shell_to_term[READ]) < 0)
+		err_mess("Failed to close shell_to_term[READ]");
 	      shell_exit_status();
 	      exit(0);
 	    }
 	    else if (c == LF) {
-	      write(STDOUT_FILENO, crlf, 2);
+	      if (write(STDOUT_FILENO, crlf, 2) < 0)
+		err_mess("Failed to write crlf to STDOUT");
 	    }
 	    else {
-	      write(STDOUT_FILENO, &c, 1);
+	      if (write(STDOUT_FILENO, &c, 1) < 0)
+		err_mess("Failed to write to STDOUT");
 	    }
 	  }
 	}
 	else if (fds[1].revents && (fds[1].revents == POLLERR || fds[1].revents == POLLHUP)) {
-	  close(shell_to_term[READ]);
+	  if (close(shell_to_term[READ]) < 0)
+	    err_mess("Failed to close shell_to_term[READ]");
 	  shell_exit_status();
 	  exit(0);
 	}
@@ -210,25 +215,30 @@ int main(int argc, char** argv) {
     }
     else { /* Child Process */
       // terminal-to-shell pipe
-      close(term_to_shell[WRITE]); // close the shell's write side 
-      dup2(term_to_shell[READ], STDIN_FILENO); // redirect the shell's read side
-      close(term_to_shell[READ]);
+      if (close(term_to_shell[WRITE]) < 0) // close the shell's write side
+	err_mess("Failed to close term_to_shell[WRITE]");
+      if (dup2(term_to_shell[READ], STDIN_FILENO) < 0) // redirect to the shell's read side
+	err_mess("Failed to redirect term_to_shell[READ] to STDIN_FILENO");
+      if (close(term_to_shell[READ]))
+	err_mess("Failed to close term_to_shell[READ]");
 
       // shell-to-terminal pipe
-      close(shell_to_term[READ]); // close the shell's read side
-      dup2(shell_to_term[WRITE], STDOUT_FILENO); // redirect the shell's write side
-      dup2(shell_to_term[WRITE], STDERR_FILENO);
-      close(shell_to_term[READ]);
+      if(close(shell_to_term[READ]) < 0) // close the shell's read side
+	err_mess("Failed to close shell_to_term[READ]");
+      if (dup2(shell_to_term[WRITE], STDOUT_FILENO) < 0) // redirect to the shell's write side
+	err_mess("Failed to redirect STDOUT to shell_to_term[WRITE]");
+      if (dup2(shell_to_term[WRITE], STDERR_FILENO) < 0) 
+        err_mess("Failed to redirect STDERR to shell_to_term[WRITE]");
+      if (close(shell_to_term[WRITE]) < 0) 
+        err_mess("Failed to close shell_to_term[WRITE]");
 
       // execute the shell (code after exec doesn't execute)
       char* exec_argv [2];
       char shell_name [] = "/bin/bash";
       exec_argv[0] = shell_name;
       exec_argv[1] = NULL;
-      if (execvp(shell_name, exec_argv) < 0) {
-	fprintf(stderr, "Shell execution failed: %s%s", strerror(errno), crlf);
-	exit(1);
-      }
+      if (execvp(shell_name, exec_argv) < 0)
+	err_mess("Shell execution failed");
     }
 
     shell_exit_status();
@@ -242,10 +252,8 @@ int main(int argc, char** argv) {
                -1 means read error
     */
     read_status = read(STDIN_FILENO, &key_input, 10);
-    if (read_status < 0) {
-      fprintf(stderr, "Error reading from keyboard: %s%s", strerror(errno), crlf);
-      exit(1);
-    }
+    if (read_status < 0)
+      err_mess("Error reading from keyboard");
     else if (read_status == 0) {
       exit(0);
     }
@@ -253,21 +261,22 @@ int main(int argc, char** argv) {
     for(int i = 0; i < read_status; i++) {
       c = key_input[i];
       if (c == EOF2) {
-	write(STDOUT_FILENO, "^D", 2);
+	if (write(STDOUT_FILENO, "^D", 2) < 0)
+	  err_mess("Failed to write ^D to STDOUT");
 	exit(0);
       }
       else if (c == ETX) {
-	write(STDOUT_FILENO, "^C", 2);
+	if (write(STDOUT_FILENO, "^C", 2) < 0)
+	  err_mess("Failed to write ^C to STDOUT");
 	exit(0);
       }
       else if (c == CR || c == LF) {
-	c = CR;
-	write(STDOUT_FILENO, &c, 1);
-	c = LF;
-	write(STDOUT_FILENO, &c, 1);
+	if (write(STDOUT_FILENO, crlf, 2) < 0)
+	  err_mess("Failed to write crlf to STDOUT");
       }
       else {
-	write(STDOUT_FILENO, &c, 1);
+	if (write(STDOUT_FILENO, &c, 1) < 0)
+	  err_mess("Failed to write to STDOUT");
       }
     }
   }
