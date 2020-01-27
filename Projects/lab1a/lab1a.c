@@ -13,7 +13,6 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <sys/types.h>
-
 #include <string.h>
 #include <errno.h>
 
@@ -21,8 +20,6 @@
 #define EOF2 '\004' // End of transmission (^D)
 #define LF '\012'  // Line feed
 #define CR '\015'  // Carriage return
-
-#define READ_SIZE 256
 
 #define READ 0
 #define WRITE 1
@@ -82,8 +79,8 @@ void shell_exit_status() {
 }
 
 void sigpipe_handler() {
-  close(shell_to_term[READ]);
   close(term_to_shell[WRITE]);
+  close(shell_to_term[READ]);
   kill(pid, SIGINT);
   shell_exit_status();
   exit(0);
@@ -104,6 +101,8 @@ int main(int argc, char** argv) {
     {0,0,0,0}
   };
 
+  set_input_mode(); //set input mode before anything else
+
   while((c = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
     switch(c) {
       case 's':
@@ -118,10 +117,9 @@ int main(int argc, char** argv) {
 
   if (shell_flag) {
     // Make two pipes for terminal-to-shell and shell-to-terminal data flows
-    if (pipe(term_to_shell) != 0 || pipe(shell_to_term) != 0) 
-      err_mess("Pipe failed");
+    if (pipe(shell_to_term) != 0 || pipe(term_to_shell) != 0) 
+      err_mess("Pipe creation failed");
 
-    set_input_mode();
     signal(SIGPIPE, sigpipe_handler);
 
     // Fork to create a child process (the shell)
@@ -134,11 +132,10 @@ int main(int argc, char** argv) {
       if (close(shell_to_term[WRITE]) < 0) // shell-to-terminal pipe, close the terminal's write side
 	err_mess("Failed to close shell_to_term[WRITE]");
       
-      struct pollfd fds[2];
-      fds[0].fd = STDIN_FILENO;
-      fds[0].events = POLLIN | POLLHUP | POLLERR;
-      fds[1].fd = shell_to_term[READ];
-      fds[1].events = POLLIN | POLLHUP | POLLERR;
+      struct pollfd fds[] = {
+	{STDIN_FILENO, POLLIN|POLLHUP|POLLERR, 0},
+	{shell_to_term[READ], POLLIN|POLLHUP|POLLERR, 0}
+      };
 
       while(1) {
 	if ((poll_status = poll(fds, 2, 0)) < 0) 
@@ -212,6 +209,9 @@ int main(int argc, char** argv) {
 	  exit(0);
 	}
       }
+
+      shell_exit_status();
+      exit(0);
     }
     else { /* Child Process */
       // terminal-to-shell pipe
@@ -244,8 +244,6 @@ int main(int argc, char** argv) {
     shell_exit_status();
     exit(0);
   }
-  	 
-  set_input_mode();
 
   while(1) {
     /* status:  0 means ETX or no more bytes read

@@ -1,0 +1,24 @@
+NAME: YUCI SHEN
+EMAIL: SHEN.YUCI11@GMAIL.COM
+ID: 604836772
+
+Lab 1A: I/O and IPC
+---------------------------------------------------------
+File description
+  * lab1a.c: Source code of the program
+  * Makefile: Supports build (default), dist, and clean
+  * README: Describes the contents of the dist
+
+Functionalities
+  * Supports two modes: no argument, and --shell.
+    * Run with no argument for a character-at-a-time, full duplex-terminal.
+    * Run with --shell argument to create a parent process (terminal) and a forked child process (shell) that pass information back and forth through two unidirectional pipes. The parent process takes in input	from both the shell and the keyboard, and the timing of inputs between the shell and keyboard is handled with a main loop that calls poll(2).
+
+References
+  * man pages: kill(2), poll(2), pipe(2), exec(3), wait(2), termios(3), dup(2), waitpid(2), read(2), and write(2).
+
+Notes
+  * I called kill(pid, SIGINT) to kill the forked process. The kill call worked, and I get the required output but still failed the sanity check.
+    I examined the sanity check's STDOUT for that test, and found that the reason for the failure was because the sanity check's "trap" command was
+      being read into bash as "rap". After manually entering "trap 'echo got sigint' sigint" into the process, I was able to get the proper output.
+    
