@@ -35,10 +35,14 @@
 #define BUFF_SIZE 256
 
 char crlf[2] = {CR, LF};
-int pid;
-int term_to_shell[2];
-int shell_to_term[2];
 
+/* Variables to store argument flags and options */
+int port_flag = 0;
+int log_flag = 0;
+int compress_flag = 0;
+
+/* Variables to store socket, log, and compression information*/
+int sock_fd, log_fd;
 z_stream client_to_server;
 z_stream server_to_client;
 
@@ -136,9 +140,14 @@ void set_input_mode () {
    CLEAN UP
    --------*/
 void clean_up() {
+  if (log_flag == 1)
+    close(log_fd);
+  if (compress_flag == 1) {
+    deflateEnd(&client_to_server);
+    inflateEnd(&server_to_client);
+  }
+  close(sock_fd);
   reset_input_mode();
-  deflateEnd(&client_to_server);
-  // inflateEnd(&server_to_client);
 }
 
 /* ---------
@@ -146,7 +155,6 @@ void clean_up() {
    --------- */
 int main(int argc, char** argv) {
   /* Variables to store infomation */
-  int log_fd;
   char c;
   char read_buffer[BUFF_SIZE];
   char comp_buffer[4*BUFF_SIZE];
@@ -157,13 +165,8 @@ int main(int argc, char** argv) {
   int read_status;
   int poll_status;
 
-  /* Variables to store argument flags and options */
-  int port_flag = 0;
-  int log_flag = 0;
-  int compress_flag = 0;
-
   /* Variables for socket communication */
-  int sock_fd, port_num;
+  int port_num;
   struct sockaddr_in serv_addr;
   struct hostent *server;
   
@@ -286,17 +289,13 @@ int main(int argc, char** argv) {
       read_status = safe_read(fds[1].fd, read_buffer, BUFF_SIZE, "socket");
 
       /* Exits if the read is 0, which only happens if the server socket closes */
-      if (read_status == 0) { 
-	close(sock_fd);
-	safe_write(STDOUT_FILENO, "Server closed", 13, "terminal");
-	safe_write(STDOUT_FILENO, crlf, 2, "terminal");
+      if (read_status == 0)
 	exit(0);
-      }
 
-      if (log_flag == 1)
+      if (log_flag == 1) // Logs received data
         log_to_file(log_fd, RECEIVED, read_buffer, read_status, num_bytes);
 
-      if (compress_flag == 1) {
+      if (compress_flag == 1) { // Decompresses before processing
 	server_to_client.avail_in = read_status;
 	server_to_client.next_in = (unsigned char*) read_buffer;
 	server_to_client.avail_out = 4*BUFF_SIZE;
@@ -316,7 +315,7 @@ int main(int argc, char** argv) {
 	    safe_write(STDOUT_FILENO, &c, 1, "terminal");
 	}
       }
-      else {
+      else { // Immediately processes
 	for (int i = 0; i < read_status; i++) {
 	  c = read_buffer[i];
 	  if (c == LF || c == CR)

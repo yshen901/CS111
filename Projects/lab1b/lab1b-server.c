@@ -30,16 +30,23 @@
 #define BUFF_SIZE 256
 
 char crlf[2] = {CR, LF};
+
+/* Variables to store argument flags and options */
+int port_flag = 0;
+int compress_flag = 0;
+
+/* Variables to store pipeline information */
 int pid;
 int serv_to_shell[2];
 int shell_to_serv[2];
+
+/* Variables to store socket information */
 int sock_fd1;
 int sock_fd2;
 
+/* Variables to store compression information*/
 z_stream server_to_client;
 z_stream client_to_server;
-
-struct termios saved_attributes;
 
 /* ------------------
     HELPER FUNCTIONS 
@@ -93,8 +100,6 @@ void shell_exit_status() {
 }
 
 void sigpipe_handler() {
-  close(sock_fd1);
-  close(sock_fd2);
   close(serv_to_shell[WRITE]);
   close(shell_to_serv[READ]);
   kill(pid, SIGINT);
@@ -106,8 +111,13 @@ void sigpipe_handler() {
    CLEAN UP
    --------*/
 void clean_up() {
-  inflateEnd(&client_to_server);
-  deflateEnd(&server_to_client);
+  close(sock_fd1);
+  close(sock_fd2);
+  if (compress_flag) {
+    inflateEnd(&client_to_server);
+    deflateEnd(&server_to_client);
+  }
+  shell_exit_status();
 }
 
 /* ---------
@@ -123,11 +133,7 @@ int main(int argc, char** argv) {
   int read_status;
   int poll_status;
   int zlib_status;
-
-  /* Variables to store argument flags and options */
-  int port_flag = 0;
-  int compress_flag = 0;
-
+  
   /* Variables for socket communication */
   int port_num;
   struct sockaddr_in serv_addr, cli_addr;
@@ -148,7 +154,6 @@ int main(int argc, char** argv) {
       case 'c':
 	compress_flag = 1;
 	initialize_compression();
-	atexit(clean_up);
 	break;
       case '?':
       default:
@@ -156,6 +161,8 @@ int main(int argc, char** argv) {
         exit(1);
     }
   }
+
+  atexit(clean_up);
 
   /* TRIGGER ERROR IF: 1) port option isn't triggered or 2) port number is reserved */
   if (port_flag == 0) {
@@ -236,7 +243,7 @@ int main(int argc, char** argv) {
 	  close(serv_to_shell[WRITE]);
 	  open = 0;
 	}
-	else {
+	else { // Decompresses data before processing
 	  if (compress_flag == 1) {
 	    client_to_server.avail_in = read_status;
 	    client_to_server.next_in = (unsigned char *) read_buffer;
@@ -259,7 +266,7 @@ int main(int argc, char** argv) {
 		safe_write(serv_to_shell[WRITE], &c, 1, "shell");
 	    }
 	  }
-	  else {
+	  else { // Directly processes
 	    for (int i = 0; i < read_status; i++) {
 	      c = read_buffer[i];
 	      if (c == EOT) // close the write end...shell will exit (send EOT)
@@ -283,7 +290,7 @@ int main(int argc, char** argv) {
 
       if (fds[1].revents & POLLIN) { // Shell has input...send through socket
 	read_status = safe_read(fds[1].fd, read_buffer, BUFF_SIZE, "shell");
-	if (compress_flag == 1) {
+	if (compress_flag == 1) { // Compresses data before sending
 	  server_to_client.avail_in = read_status;
 	  server_to_client.next_in = (unsigned char*) read_buffer;
 	  server_to_client.avail_out = BUFF_SIZE;
@@ -298,7 +305,7 @@ int main(int argc, char** argv) {
 	  }
 	  safe_write(sock_fd2, comp_buffer, BUFF_SIZE - server_to_client.avail_out, "socket");
 	}
-	else {
+	else { // Directly sends the whole thing
 	  safe_write(sock_fd2, read_buffer, read_status, "socket");
 	}
       }
@@ -311,11 +318,8 @@ int main(int argc, char** argv) {
 	open = 0;
       }
     }
-    close(sock_fd1);
-    close(sock_fd2);
     close(shell_to_serv[READ]);
     close(serv_to_shell[WRITE]);
-    shell_exit_status();
     exit(0);
   }
   exit(0);
