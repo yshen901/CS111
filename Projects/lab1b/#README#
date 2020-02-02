@@ -1,0 +1,17 @@
+NAME: YUCI SHEN
+EMAIL: SHEN.YUCI11@GMAIL.COM
+UID: 604836772
+
+Lab 1B: Compressed Network Communication
+----------------------------------------
+File Description
+  * lab1b-client.c: source code for the client program
+  * lab1b-server.c: source code for the server program
+  * Makefile	  : supports build (default), build-client, build-server, dist, and clean
+  * READMEe	  : describes the contents of the dist
+
+Functionalities
+  * Client has one required argument, --port=port#, and two optional arguments, --log=filename, and --compress.
+      * --port=port# is used to specify the port number the server and shell with connect on
+      * --log=filename is used to start a log of all SENT and RECEIVED data
+      * --compress is used to compress all client-server communication using zlib's deflat
