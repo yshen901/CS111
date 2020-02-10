@@ -1,0 +1,17 @@
+NAME: YUCI SHEN
+EMAIL: SHEN.YUCI11@GMAIL.COM
+UID: 604836772
+
+Lab 4A: Beaglebone Bringup
+--------------------------
+File Description:
+  * my_beaglebone.png	A selfie of me holding my Beaglebone
+  * connected.png	Shows the Beaglebone's name and a configured network access
+  * copy.png		Shows me copying a program from my laptop to my Beaglebone on local session
+  * build_run.png	Shows me building and running a program on WIFI SSH
+  * git.png		Shows me installing git and cloning a repository on WIFI SSH
+  * README		Contains the file descriptions and Beaglebone MAC address and S/N
+
+
+S/N: BBGW17051132
+MAC: 2CF7F106636C
