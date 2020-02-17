@@ -1,223 +1,242 @@
-/*
-    NAME: Po-Chun Yang
-    EMAIL: a29831968@g.ucla.edu
-    ID: 605297984
-    SLIPDAYS: 0
-*/
-
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>		// for using string
-#include <getopt.h>     // for getopt_long()
-#include <time.h>		// for clock_gettime()
-#include <pthread.h>	// for multithread implementation
+#include <string.h>
+#include <unistd.h>
+#include <getopt.h>
 #include <errno.h>
+#include <time.h>
 
-#define ONE_BILLION 1000000000L;
+pthread_mutex_t m_lock;
+volatile int s_lock = 0;
 
-// initialize the long long counter to 0
-long long counter = 0;
+/* THREAD ARGUMENTS */
+struct args {
+  int num_iters;
+  long long* pointer;
+  int y_flag;
+  char sync_opt;
+};
 
-// flag for options
-int iter_flag;
-int thread_flag;
-int opt_yield = 0;
-int sync_flag;
+/* HELPER FUNCTIONS */
+void printCSV(char sync_opt, int y_flag,
+	      int num_threads, int num_iters, long num_ops,
+	      long total_time, long avg_optime, long long counter
+	      ) {
 
-// iter times, thread numbers
-int iter_times = 1;
-int thread_nums = 1;
-int lock = 0;
+  char name [50] = "add";
+  if (y_flag == 1)
+    strcat(name, "-yield");
 
-// lock type 
-int NONE = 0;
-int MUTEX = 1;
-int SPIN_LOCK = 2;
-int COMPARE_AND_SWAP = 3;
+  if (sync_opt == 'm')
+    strcat(name, "-m");
+  else if (sync_opt == 'c')
+    strcat(name, "-c");
+  else if (sync_opt == 's')
+    strcat(name, "-s");
+  else
+    strcat(name, "-none");
 
-
-// mutex, spin_lock
-pthread_mutex_t mutex;
-long long spinLock = 0;
-
-// test name
-char * test = "add-none";
-void get_test_name() {
-	if (opt_yield) {
-		if (lock == MUTEX) {
-			test = "add-yield-m";
-		}else if (lock == SPIN_LOCK){
-			test = "add-yield-s";
-		}else if (lock == COMPARE_AND_SWAP) {
-			test = "add-yield-c";
-		}else {
-			test = "add-yield-none";
-		}
-	}else {
-		if (lock == MUTEX) {
-			test = "add-m";
-		}else if (lock == SPIN_LOCK){
-			test = "add-s";
-		}else if (lock == COMPARE_AND_SWAP) {
-			test = "add-c";
-		}
-	}
+  printf("%s,%d,%d,%ld,%ld,%ld,%lld\n",
+	 name, num_threads, num_iters, num_ops, total_time, avg_optime, counter);
 }
 
-// detroy mutex right before exit
-void destroyMutex(){
-    if(lock == MUTEX){
-        pthread_mutex_destroy(&mutex);
-    }
+/* THREAD FUNCTIONS */
+void add_none(long long *pointer, long long value, int y_flag) {
+  long long sum = *pointer + value;
+  if (y_flag)
+    sched_yield();
+  *pointer = sum;
 }
 
-// race condition
-void add (long long *pointer, long long value) {
-	long long sum = *pointer + value;
-	if (opt_yield) {sched_yield();}
-	*pointer = sum;
+void add_mutex(long long *pointer, long long value, int y_flag) {
+  pthread_mutex_lock(&m_lock);
+  long long sum = *pointer + value;
+  if (y_flag)
+    sched_yield();
+  *pointer = sum;
+  pthread_mutex_unlock(&m_lock);
 }
 
-
-
-// mutex, spin_lock, compare_and_swap, none
-void add_multiple_way (int val) {
-	for (int i = 0; i < iter_times; i++) {
-		if (lock == MUTEX) {
-			// mutex
-			pthread_mutex_lock(&mutex);
-			add(&counter, val);
-			pthread_mutex_unlock(&mutex);
-
-		}else if (lock == SPIN_LOCK) {
-			// spin lock 
-			while(__sync_lock_test_and_set(&spinLock, 1));
-	        add(&counter, val);
-	        __sync_lock_release(&spinLock);
-
-		}else if (lock == COMPARE_AND_SWAP) {
-			// compare and swap
-			long long oldVal, newVal;
-	        do{
-	            oldVal = counter;
-	            newVal = oldVal + val;
-	            if (opt_yield) {sched_yield();}
-	        } while(__sync_val_compare_and_swap(&counter, oldVal, newVal) != oldVal);
-
-		}else {
-			// none lock
-			add(&counter, val);
-		}
-	}
+void add_spin(long long *pointer, long long value, int y_flag) {
+  while(__sync_lock_test_and_set(&s_lock, 1));
+  long long sum = *pointer + value;
+  if (y_flag)
+    sched_yield();
+  *pointer = sum;
+  __sync_lock_release(&s_lock);
 }
 
-void add_sub() {
-	add_multiple_way(1);
-	add_multiple_way(-1);
+void add_cas(long long *pointer, long long value, int y_flag) {
+  long long oldval = *pointer;
+
+  while (__sync_val_compare_and_swap(pointer, oldval, oldval + value) != oldval) {
+    oldval = *pointer;
+    if (y_flag)
+      sched_yield();
+  }
 }
 
+void* thread_func(void *args) {
+  int num_iters = ((struct args*)args)->num_iters;
+  long long * pointer = ((struct args*)args)->pointer;
+  int y_flag = ((struct args*)args)->y_flag;
+  char sync_opt = ((struct args*)args)->sync_opt;
 
-
-
-
-int main(int argc, char **argv) {
-
-	// options declaration
-	static struct option long_options[] = {
-		{"iterations", required_argument, &iter_flag, 1},
-		{"threads", required_argument, &thread_flag, 1},
-		{"yield", no_argument, &opt_yield, 1},
-		{"sync", required_argument, &sync_flag, 1},
-		{0, 0, 0, 0}
-	};
-
-	int opt_index;
-	int c;
-	while (1) {
-		c = getopt_long(argc, argv, "", long_options, &opt_index);
-		if (c == -1) break;
-		if (c != 0) {
-			fprintf(stderr, "Error : Invalid argument.\n");
-			exit(1);
-		}
-		if (opt_index == 0) {
-			iter_times = atoi(optarg);
-		}
-		if (opt_index == 1) {
-			thread_nums = atoi(optarg);
-		}
-		if (opt_index == 2) {
-			opt_yield = 1;
-		}
-		if (opt_index == 3) {
-			if (strlen(optarg) != 1) {
-				fprintf(stderr, "Error : Invalid option. Sync argument must be one letter\n");
-                exit(1);
-			}
-			switch(optarg[0]) {
-				case 'm':	 // Mutex
-					lock = MUTEX;
-					break;
-				case 's':
-					lock = SPIN_LOCK; // spin lock
-					break;
-				case 'c':
-					lock = COMPARE_AND_SWAP; // compare and swap
-					break;
-				default:
-					fprintf(stderr, "Error: sync argument invalid.\n");
-					exit(1);
-			}
-		}
-	}
-	// debug
-	// printf("iter : %d, thread : %d, yield: %d, lock : %d\n", iter_times, thread_nums, opt_yield, lock);
-
-	// timer start
-	
-	struct timespec start_time, end_time;
-    
-    if(clock_gettime(CLOCK_MONOTONIC, &start_time) < 0){
-    	fprintf(stderr, "Error: Getting start time error.\n");
-    	exit(1);
+  switch(sync_opt) {
+  case 'm':
+    for (int i = 0; i < num_iters; i++) {
+      add_mutex(pointer, 1, y_flag);
+      add_mutex(pointer, -1, y_flag);
     }
-
-    // mutex initialize
-    if (lock == MUTEX) {
-    	if (pthread_mutex_init(&mutex, NULL) != 0) { 
-    		fprintf(stderr, "Error : mutex initialize failed.\n");
-    		exit(1);
-	    } 
+    break;
+  case 's':
+    for (int i = 0; i < num_iters; i++) {
+      add_spin(pointer, 1, y_flag);
+      add_spin(pointer, -1, y_flag);
     }
-
-    // pthread implementation
-    pthread_t tid[thread_nums];
-
-    for (int i = 0; i < thread_nums; i++) {
-    	if (pthread_create(&tid[i], NULL, (void*)&add_sub, &counter) < 0) {
-    		fprintf(stderr, "Error : pthread : %d create error.\n", i);
-    		exit(1);
-    	}
+    break;
+  case 'c':
+    for (int i = 0; i < num_iters; i++) {
+      add_cas(pointer, 1, y_flag);
+      add_spin(pointer, -1, y_flag);
     }
-    for (int i = 0; i < thread_nums; i++) {
-    	if (pthread_join(tid[i], NULL) < 0) {
-    		fprintf(stderr, "Error : pthread : %d join error.\n", i);
-    		exit(1);
-    	}
+    break;
+  default:
+    for (int i = 0; i < num_iters; i++) {
+      add_none(pointer, 1, y_flag);
+      add_none(pointer, -1, y_flag);
     }
+  }
+  return NULL;
+}
 
-	
-    // timer end
-    if (clock_gettime(CLOCK_MONOTONIC, &end_time) < 0){
-    	fprintf(stderr, "Error: Getting end time error.\n");
-    	exit(1);
+int main(int argc, char ** argv) {
+  char c;
+  int option_index = 0;
+  
+  int t_flag, i_flag, y_flag;
+  char sync_opt = 'n';
+  
+  int num_threads = 1;
+  int num_iters = 1;
+  pthread_t *tid;
+  long long counter = 0;
+  
+  struct timespec start_time, end_time;
+  
+  static struct option long_options[] = {
+    {"threads", required_argument, 0, 't'},
+    {"iterations", required_argument, 0, 'i'},
+    {"sync", required_argument, 0, 's'},
+    {"yield", no_argument, 0, 'y'},
+    {0,0,0,0}
+  };
+
+  while((c = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
+    switch(c) {
+    case 't':
+      t_flag = 1;
+      num_threads = atoi(optarg);
+      break;
+    case 'i':
+      i_flag = 1;
+      num_iters = atoi(optarg);
+      break;
+    case 'y':
+      y_flag = 1;
+      break;
+    case 's':
+      sync_opt = optarg[0]; // mutex, spin, or CAS locks
+      break;
+    case '?':
+    default:
+      fprintf(stderr, "ERROR processing arguments, please use --threads={num_threads} or --iterations={num_iterations}\n");
+      exit(1);
     }
+  }
 
-    long long time_total = (end_time.tv_sec - start_time.tv_sec) * ONE_BILLION;
-    time_total += (end_time.tv_nsec - start_time.tv_nsec);
-	int operation_num = iter_times * thread_nums * 2;
-	get_test_name();
-	printf("%s,%d,%d,%d,%lld,%lld,%lld\n", test, thread_nums, iter_times, operation_num, time_total, time_total / operation_num, counter);
-	atexit(destroyMutex);
-	exit(0);
+  // Checks for missing required arguments
+  if (t_flag != 1 || i_flag != 1) {
+    fprintf(stderr, "ERROR missing arguments, --threads and --iterations are mandatory arguments\n");
+    exit(1);
+  }
+
+  // Checks for invalid synchronization arguments
+  if (sync_opt != 'n' && sync_opt != 'c' && sync_opt != 'm' && sync_opt != 's') {
+    fprintf(stderr, "ERROR invalid synchronization options, please use s, m, or c");
+    exit(1);
+  }
+
+  // Set aside memory for thread ids
+  tid = malloc(num_threads * sizeof(pthread_t));
+  if (tid == NULL) {
+    fprintf(stderr, "ERROR memory allocation failed (tid): %s\n", strerror(errno));
+    exit(1);
+  }
+
+  // Structure for holding thread function arguments
+  struct args *targv = (struct args *)malloc(sizeof(struct args));
+  if (targv == NULL) {
+    fprintf(stderr, "ERROR memory allocation failed (targv): %s\n", strerror(errno));
+    exit(1);
+  }
+  targv->num_iters = num_iters;
+  targv->pointer = &counter;
+  targv->y_flag = y_flag;
+  targv->sync_opt = sync_opt;
+  
+  // Setup synchronization options
+  if (sync_opt == 'm') {
+    if (pthread_mutex_init(&m_lock, NULL) != 0) {
+      printf("ERROR failed to initialize mutex\n");
+      exit(1);
+    }
+  }
+
+  // Get start-time
+  if(clock_gettime(CLOCK_MONOTONIC, &start_time) != 0) {
+    fprintf(stderr, "ERROR gettime failed: %s\n", strerror(errno));
+    exit(1);
+  }
+
+  // Run the threads with the given options
+  for (int i = 0; i < num_threads; i++) {
+    if(pthread_create(&(tid[i]), NULL, &thread_func, (void *)targv) != 0) {
+      fprintf(stderr, "ERROR failed to create thread: %s\n", strerror(errno));
+      exit(1);
+    }
+  }
+
+  for (int i = 0; i < num_threads; i++) {
+    if(pthread_join(tid[i], NULL) != 0) {
+      fprintf(stderr, "ERROR failed to join thread: %s\n", strerror(errno));
+      exit(1);
+    }
+  }
+
+  // Get end-time
+  if(clock_gettime(CLOCK_MONOTONIC, &end_time) != 0) {
+    fprintf(stderr, "ERROR gettime failed: %s\n", strerror(errno));
+    exit(1);
+  }
+
+  // Cleanup synchronization options
+  if (sync_opt == 'm') {
+    if (pthread_mutex_destroy(&m_lock) != 0) {
+      printf("ERROR failed to initialize mutex\n");
+      exit(1);
+    }
+  }
+
+  // Calculate the relevant values and print a CSV row
+  long long num_ops = num_threads * num_iters * 2;
+  long total_time = 1000000000L * (end_time.tv_sec - start_time.tv_sec) + end_time.tv_nsec - start_time.tv_nsec;
+  long avg_optime = total_time / num_ops;
+  printCSV(sync_opt, y_flag, num_threads, num_iters, num_ops, total_time, avg_optime, counter);
+
+  // Free relevant values and exit
+  free(targv);
+  free(tid);
+  exit(0);
 }
