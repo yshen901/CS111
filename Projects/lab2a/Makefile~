@@ -1,0 +1,215 @@
+# Name: YUCI SHEN
+# EMAIL: SHEN.YUCI11@GMAIL.COM
+# UID: 604836772
+
+CC = gcc
+CFLAGS = -g -Wall -Wextra
+ID = 604836772
+ARCHIVE = lab2a-$(ID).tar.gz
+SOURCES = lab2_add.c Makefile
+
+build:
+	@$(CC) $(CFLAGS) -o lab2_add lab2_add.c -lpthread
+
+test-add-none:
+	@./lab2_add --threads=2   --iterations=100    >> lab2_add.csv
+	@./lab2_add --threads=2   --iterations=1000   >> lab2_add.csv
+	@./lab2_add --threads=2   --iterations=10000  >> lab2_add.csv
+	@./lab2_add --threads=2   --iterations=100000 >> lab2_add.csv
+
+	@./lab2_add --threads=4   --iterations=100    >> lab2_add.csv
+	@./lab2_add --threads=4   --iterations=1000   >> lab2_add.csv
+	@./lab2_add --threads=4   --iterations=10000  >> lab2_add.csv
+	@./lab2_add --threads=4   --iterations=100000 >> lab2_add.csv
+
+	@./lab2_add --threads=8   --iterations=100    >> lab2_add.csv
+	@./lab2_add --threads=8   --iterations=1000   >> lab2_add.csv
+	@./lab2_add --threads=8   --iterations=10000  >> lab2_add.csv
+	@./lab2_add --threads=8   --iterations=100000 >> lab2_add.csv
+
+	@./lab2_add --threads=12  --iterations=100    >> lab2_add.csv
+	@./lab2_add --threads=12  --iterations=1000   >> lab2_add.csv
+	@./lab2_add --threads=12  --iterations=10000  >> lab2_add.csv
+	@./lab2_add --threads=12  --iterations=100000 >> lab2_add.csv
+
+test-add-none-single:
+	@./lab2_add --threads=1  --iterations=10      >> lab2_add.csv       
+	@./lab2_add --threads=1  --iterations=20      >> lab2_add.csv
+	@./lab2_add --threads=1  --iterations=40      >> lab2_add.csv
+	@./lab2_add --threads=1  --iterations=80      >> lab2_add.csv
+	@./lab2_add --threads=1  --iterations=100     >> lab2_add.csv
+	@./lab2_add --threads=1  --iterations=1000    >> lab2_add.csv
+	@./lab2_add --threads=1  --iterations=10000   >> lab2_add.csv
+	@./lab2_add --threads=1  --iterations=100000  >> lab2_add.csv
+
+test-add-none-yield:
+	@./lab2_add --threads=2  --iterations=100    --yield  >> lab2_add.csv
+	@./lab2_add --threads=2  --iterations=1000   --yield  >> lab2_add.csv
+	@./lab2_add --threads=2  --iterations=10000  --yield  >> lab2_add.csv
+	@./lab2_add --threads=2  --iterations=100000 --yield  >> lab2_add.csv
+
+	@./lab2_add --threads=4  --iterations=100    --yield  >> lab2_add.csv
+	@./lab2_add --threads=4  --iterations=1000   --yield  >> lab2_add.csv
+	@./lab2_add --threads=4  --iterations=10000  --yield  >> lab2_add.csv
+	@./lab2_add --threads=4  --iterations=100000 --yield  >> lab2_add.csv
+
+	@./lab2_add --threads=8  --iterations=100    --yield  >> lab2_add.csv
+	@./lab2_add --threads=8  --iterations=1000   --yield  >> lab2_add.csv
+	@./lab2_add --threads=8  --iterations=10000  --yield  >> lab2_add.csv
+	@./lab2_add --threads=8  --iterations=100000 --yield  >> lab2_add.csv
+
+	@./lab2_add --threads=12 --iterations=100    --yield  >> lab2_add.csv
+	@./lab2_add --threads=12 --iterations=1000   --yield  >> lab2_add.csv
+	@./lab2_add --threads=12 --iterations=10000  --yield  >> lab2_add.csv
+	@./lab2_add --threads=12 --iterations=100000 --yield  >> lab2_add.csv
+
+test-add-mutex-yield:
+	@./lab2_add --threads=2  --iterations=100    --sync=m --yield  >> lab2_add.csv
+	@./lab2_add --threads=2  --iterations=1000   --sync=m --yield  >> lab2_add.csv
+	@./lab2_add --threads=2  --iterations=10000  --sync=m --yield  >> lab2_add.csv
+
+	@./lab2_add --threads=4  --iterations=100    --sync=m --yield  >> lab2_add.csv
+	@./lab2_add --threads=4  --iterations=1000   --sync=m --yield  >> lab2_add.csv
+	@./lab2_add --threads=4  --iterations=10000  --sync=m --yield  >> lab2_add.csv
+
+	@./lab2_add --threads=8  --iterations=100    --sync=m --yield  >> lab2_add.csv
+	@./lab2_add --threads=8  --iterations=1000   --sync=m --yield  >> lab2_add.csv
+	@./lab2_add --threads=8  --iterations=10000  --sync=m --yield  >> lab2_add.csv
+
+	@./lab2_add --threads=12 --iterations=100    --sync=m --yield  >> lab2_add.csv
+	@./lab2_add --threads=12 --iterations=1000   --sync=m --yield  >> lab2_add.csv
+	@./lab2_add --threads=12 --iterations=10000  --sync=m --yield  >> lab2_add.csv
+
+test-add-cas-yield:
+	@./lab2_add --threads=2  --iterations=100    --sync=c --yield  >> lab2_add.csv
+	@./lab2_add --threads=2  --iterations=1000   --sync=c --yield  >> lab2_add.csv
+	@./lab2_add --threads=2  --iterations=10000  --sync=c --yield  >> lab2_add.csv
+
+	@./lab2_add --threads=4  --iterations=100    --sync=c --yield  >> lab2_add.csv
+	@./lab2_add --threads=4  --iterations=1000   --sync=c --yield  >> lab2_add.csv
+	@./lab2_add --threads=4  --iterations=10000  --sync=c --yield  >> lab2_add.csv
+
+	@./lab2_add --threads=8  --iterations=100    --sync=c --yield  >> lab2_add.csv
+	@./lab2_add --threads=8  --iterations=1000   --sync=c --yield  >> lab2_add.csv
+	@./lab2_add --threads=8  --iterations=10000  --sync=c --yield  >> lab2_add.csv
+
+	@./lab2_add --threads=12 --iterations=100    --sync=c --yield  >> lab2_add.csv
+	@./lab2_add --threads=12 --iterations=1000   --sync=c --yield  >> lab2_add.csv
+	@./lab2_add --threads=12 --iterations=10000  --sync=c --yield  >> lab2_add.csv
+
+test-add-spin-yield:
+	@./lab2_add --threads=2  --iterations=100    --sync=s --yield  >> lab2_add.csv
+	@./lab2_add --threads=2  --iterations=1000   --sync=s --yield  >> lab2_add.csv
+
+	@./lab2_add --threads=4  --iterations=100    --sync=s --yield  >> lab2_add.csv
+	@./lab2_add --threads=4  --iterations=1000   --sync=s --yield  >> lab2_add.csv
+
+	@./lab2_add --threads=8  --iterations=100    --sync=s --yield  >> lab2_add.csv
+	@./lab2_add --threads=8  --iterations=1000   --sync=s --yield  >> lab2_add.csv
+
+	@./lab2_add --threads=12 --iterations=100    --sync=s --yield  >> lab2_add.csv
+	@./lab2_add --threads=12 --iterations=1000   --sync=s --yield  >> lab2_add.csv
+
+# For lab2_add-1
+test-add-1:
+	test-add-none
+	test-add-none-yield
+	@./lab2_add --threads=2  --iterations=10        >> lab2_add.csv
+	@./lab2_add --threads=2  --iterations=20        >> lab2_add.csv
+	@./lab2_add --threads=2  --iterations=40        >> lab2_add.csv
+	@./lab2_add --threads=2  --iterations=80        >> lab2_add.csv
+
+	@./lab2_add --threads=4  --iterations=10        >> lab2_add.csv
+	@./lab2_add --threads=4  --iterations=20        >> lab2_add.csv
+	@./lab2_add --threads=4  --iterations=40        >> lab2_add.csv
+	@./lab2_add --threads=4  --iterations=80        >> lab2_add.csv
+
+	@./lab2_add --threads=8  --iterations=10        >> lab2_add.csv
+	@./lab2_add --threads=8  --iterations=20        >> lab2_add.csv
+	@./lab2_add --threads=8  --iterations=40        >> lab2_add.csv
+	@./lab2_add --threads=8  --iterations=80        >> lab2_add.csv
+
+	@./lab2_add --threads=12 --iterations=10       >> lab2_add.csv
+	@./lab2_add --threads=12 --iterations=20       >> lab2_add.csv
+	@./lab2_add --threads=12 --iterations=40       >> lab2_add.csv
+	@./lab2_add --threads=12 --iterations=80       >> lab2_add.csv
+
+	@./lab2_add --threads=2  --iterations=10  --yield  >> lab2_add.csv
+	@./lab2_add --threads=2  --iterations=20  --yield  >> lab2_add.csv
+	@./lab2_add --threads=2  --iterations=40  --yield  >> lab2_add.csv
+	@./lab2_add --threads=2  --iterations=80  --yield  >> lab2_add.csv
+
+@./lab2_add --threads=4  --iterations=10     --yield  >> lab2_add.csv
+	@./lab2_add --threads=4  --iterations=20     --yield  >> lab2_add.csv
+	@./lab2_add --threads=4  --iterations=40     --yield  >> lab2_add.csv
+	@./lab2_add --threads=4  --iterations=80     --yield  >> lab2_add.csv
+
+	@./lab2_add --threads=8  --iterations=10     --yield  >> lab2_add.csv
+	@./lab2_add --threads=8  --iterations=20     --yield  >> lab2_add.csv
+	@./lab2_add --threads=8  --iterations=40     --yield  >> lab2_add.csv
+	@./lab2_add --threads=8  --iterations=80     --yield  >> lab2_add.csv
+
+	@./lab2_add --threads=12 --iterations=10     --yield  >> lab2_add.csv
+	@./lab2_add --threads=12 --iterations=20     --yield  >> lab2_add.csv
+	@./lab2_add --threads=12 --iterations=40     --yield  >> lab2_add.csv
+	@./lab2_add --threads=12 --iterations=80     --yield  >> lab2_add.csv
+
+# For lab2_add-2
+test-add-2:
+	test-add-none
+	test-add-none-yield
+
+# For lab2_add-3
+test-add-3:
+	test-add-none-single
+
+# For lab_add-4
+test-add-4:
+	test-add-none-yield
+	test-add-mutex-yield
+	test-add-cas-yield
+	test-add-spin-yield
+
+# For lab_add-5
+test-add-5:
+	@./lab2_add --threads=1  iterations=10000           >>  lab2_add.csv
+	@./lab2_add --threads=1  iterations=10000 --sync=m  >>  lab2_add.csv
+	@./lab2_add --threads=1  iterations=10000 --sync=c  >>  lab2_add.csv
+	@./lab2_add --threads=1  iterations=1000  --sync=s  >>  lab2_add.csv
+
+	@./lab2_add --threads=2  iterations=10000           >>  lab2_add.csv
+	@./lab2_add --threads=2  iterations=10000 --sync=m  >>  lab2_add.csv
+	@./lab2_add --threads=2  iterations=10000 --sync=c  >>  lab2_add.csv
+	@./lab2_add --threads=2  iterations=1000  --sync=s  >>  lab2_add.csv
+
+	@./lab2_add --threads=4  iterations=10000           >>  lab2_add.csv
+	@./lab2_add --threads=4  iterations=10000 --sync=m  >>  lab2_add.csv
+	@./lab2_add --threads=4  iterations=10000 --sync=c  >>  lab2_add.csv
+	@./lab2_add --threads=4  iterations=1000  --sync=s  >>  lab2_add.csv
+
+	@./lab2_add --threads=8  iterations=10000           >>  lab2_add.csv
+	@./lab2_add --threads=8  iterations=10000 --sync=m  >>  lab2_add.csv
+	@./lab2_add --threads=8  iterations=10000 --sync=c  >>  lab2_add.csv
+	@./lab2_add --threads=8  iterations=1000  --sync=s  >>  lab2_add.csv
+
+	@./lab2_add --threads=12 iterations=10000           >>  lab2_add.csv
+	@./lab2_add --threads=12 iterations=10000 --sync=m  >>  lab2_add.csv
+	@./lab2_add --threads=12 iterations=10000 --sync=c  >>  lab2_add.csv
+	@./lab2_add --threads=12 iterations=1000  --sync=s  >>  lab2_add.csv
+
+# Runs all test cases once
+test:
+	test-add-1
+	test-add-none-single
+	test-add-mutex-yield
+	test-add-cas-yield
+	test-add-spin-yield
+
+dist:
+	@tar -czf $(ARCHIVE) $(SOURCES)
+
+clean-csv:
+	@rm -f lab2_add.csv lab2_list.csv
+
+clean:
+	@rm -f lab2_add $(ARCHIVE)

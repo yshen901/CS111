@@ -61,6 +61,105 @@ void handle_segfault(int signum) {
 /* THREAD FUNCTIONS */
 void* thread_func(void *args) {
   int offset = *(int*)args;
+
+  /*
+  for (int i = 0; i < offset + num_iters; i++) {
+    if (opt_sync == 'm') {
+      // mutex
+      pthread_mutex_lock(&m_lock);
+      SortedList_insert(head, &elements[i]);
+      pthread_mutex_unlock(&m_lock);
+      
+    }else if (opt_sync == 's') {
+      // spin lock
+      while(__sync_lock_test_and_set(&s_lock, 1));
+      SortedList_insert(head, &elements[i]);
+      __sync_lock_release(&s_lock);
+    }else {
+      // none
+      SortedList_insert(head, &elements[i]);
+    }
+  }
+  // search length
+  int length = 0;
+  if (opt_sync == 'm') {
+    // mutex
+    pthread_mutex_lock(&m_lock);
+    length = SortedList_length(head);
+    if (length < 0) {
+      fprintf(stderr, "Error : Can not find length.\n");
+      exit(2);
+    }
+    pthread_mutex_unlock(&m_lock);
+    
+  }else if (opt_sync == 's') {
+    // spin lock
+    while(__sync_lock_test_and_set(&s_lock, 1));
+    length = SortedList_length(head);
+    if (length < 0) {
+      fprintf(stderr, "Error : Can not find length.\n");
+      exit(2);
+    }
+    __sync_lock_release(&s_lock);
+  }else {
+    // none
+    length = SortedList_length(head);
+    if (length < 0) {
+      fprintf(stderr, "Error : Can not find length.\n");
+      exit(2);
+    }
+  }
+  
+  // look up and delete
+  SortedListElement_t * delete_element;
+  for (int i = 0; i < offset + num_iters; i++) {
+    if (opt_sync == 'm') {
+      // mutex
+      pthread_mutex_lock(&m_lock);
+      delete_element = SortedList_lookup(head, elements[i].key);
+      if (delete_element == NULL) {
+	fprintf(stderr, "Error : look up failed.\n");
+	exit(2);
+      }
+      int ret = SortedList_delete(delete_element);
+      if (ret == 1) {
+	fprintf(stderr, "Error : delete element failed.\n");
+	exit(2);
+      }
+      pthread_mutex_unlock(&m_lock);
+      
+    }else if (opt_sync == 's') {
+      // spin lock
+      while(__sync_lock_test_and_set(&s_lock, 1));
+      delete_element = SortedList_lookup(head, elements[i].key);
+      if (delete_element == NULL) {
+	fprintf(stderr, "Error : look up failed.\n");
+	exit(2);
+      }
+      int ret = SortedList_delete(delete_element);
+      if (ret == 1) {
+	fprintf(stderr, "Error : delete element failed.\n");
+	exit(2);
+      }
+      __sync_lock_release(&s_lock);
+    }else {
+      // none
+      delete_element = SortedList_lookup(head, elements[i].key);
+      if (delete_element == NULL) {
+	fprintf(stderr, "Error : look up failed.\n");
+	exit(2);
+      }
+      int ret = SortedList_delete(delete_element);
+      if (ret == 1) {
+	fprintf(stderr, "Error : delete element failed.\n");
+	exit(2);
+      }
+    }
+  }
+  
+  return NULL;
+  */
+  
   int length;
   char key[64];
   SortedListElement_t *current;
@@ -72,7 +171,7 @@ void* thread_func(void *args) {
 
   for (int i = offset; i < offset + num_iters; i++)
     SortedList_insert(head, &elements[i]);
-    
+
   length = SortedList_length(head);
   if (length < num_iters) {
     fprintf(stderr, "ERROR items have not been inserted properly and atomically\n");
@@ -181,7 +280,7 @@ int main(int argc, char ** argv) {
 
   // Initialize the rest of the elements and their keys
   int num_eles = num_threads * num_iters;
-  char alpha[26] = "abcdefghijklmnopqrstuvwxyz";
+  //char alpha[26] = "abcdefghijklmnopqrstuvwxyz";
   
   elements = (SortedListElement_t*)malloc(sizeof(SortedListElement_t) * num_eles);
   if (elements == NULL) {
@@ -195,6 +294,7 @@ int main(int argc, char ** argv) {
     exit(1);
   }
 
+  /*
   srand((unsigned int) time(NULL));
   for (int i = 0; i < num_eles; i++) {
     keys[i] = malloc(sizeof(char) * 64);
@@ -206,6 +306,16 @@ int main(int argc, char ** argv) {
       keys[i][j] = alpha[rand() % 26];
     keys[i][63] = '\0';
     (elements + i)->key = keys[i];
+  }
+  */
+
+  srand((unsigned int) time(NULL));
+  for (int i = 0; i < num_eles; i++) {
+    char* key = malloc(16 * sizeof(char));
+    for (int j = 0; j < 15; j++) 
+      key[j] = (rand() % 26) + 'A';
+    key[15] = '\0';
+    (elements + i)->key = key;
   }
 
   // Set aside memory for thread ids
@@ -232,7 +342,7 @@ int main(int argc, char ** argv) {
   // Run the threads with the given options
   int offsets[num_threads];
   for (int i = 0; i < num_threads; i++) {
-    offsets[i] = i * num_iters;
+    offsets[i] = i * num_threads;
     if(pthread_create(&(tid[i]), NULL, &thread_func, (void*)&offsets[i]) != 0) {
       fprintf(stderr, "ERROR failed to create thread: %s\n", strerror(errno));
       exit(1);
@@ -267,7 +377,7 @@ int main(int argc, char ** argv) {
   }
 
   // Calculate the relevant values and print a CSV row
-  long long num_ops = num_threads * num_iters * 3;
+  long long num_ops = num_threads * num_iters * 2;
   long total_time = 1000000000L * (end_time.tv_sec - start_time.tv_sec) + end_time.tv_nsec - start_time.tv_nsec;
   long avg_optime = total_time / num_ops;
   printCSV(num_threads, num_lists, num_ops, total_time, avg_optime);
