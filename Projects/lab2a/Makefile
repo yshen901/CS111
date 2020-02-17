@@ -10,6 +10,7 @@ SOURCES = lab2_add.c Makefile README
 
 build:
 	@$(CC) $(CFLAGS) -o lab2_add lab2_add.c -lpthread
+	@$(CC) $(CFLAGS) -o lab2_list lab2_list.c SortedList.c -lpthread
 
 # Runs all lab2_add test cases once
 tests-add-all:
@@ -153,4 +154,4 @@ clean-csv:
 	@rm -f lab2_add.csv lab2_list.csv
 
 clean: clean-csv
-	@rm -f lab2_add $(ARCHIVE)
+	@rm -f lab2_add lab2_list $(ARCHIVE)
