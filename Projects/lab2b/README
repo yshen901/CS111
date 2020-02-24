@@ -1,0 +1,105 @@
+NAME: YUCI SHEN
+EMAIL: SHEN.YUCI11@GMAIL.COM
+UID: 604836772
+
+FILES
+-----
+  * lab2_add.c		Source code for testing and implementing shared variable arithmetic
+  * lab2_list.c		Source code for testing and implementing shared data structure manipulation
+  * SortedList.h	Header file that describes the interface for cyclical doubly linked list operations
+  * SortedList.c	Source code for cyclical doubly linked list operations
+
+  * lab2_add.csv	A CSV file containing all results from lab2_add tests
+  * lab2_list.csv	A CSV file containing all results from lab2_list tests
+  * lab2_add.gp		gnuplot script to produce graphs using lab2_add.csv
+  * lab2_list.gp	gnuplot script to produce graphs using lab2_list.csv
+
+  * lab2_add-1.png	Graph: threads and iterations required to generate a failure (with and without yields)
+  * lab2_add-2.png	Graph: average time per operation with and without yields
+  * lab2_add-3.png	Graph: average time per (single threaded) operation vs. the number of iterations
+  * lab2_add-4.png	Graph: threads and iterations that can run successfully with yields for each synch option
+  * lab2_add-5.png	Graph: average time per (protected) operation vs. the number of threads
+  
+  * lab2_list-1.png	Graph: average time per (single threaded) unprotected operation vs. number of iterations
+    			       (illustrating the correction of the per-operation cost for the list length)
+  * lab2_list-2.png	Graph: threads and iterations required to generate a failure (with and without yields)
+  * lab2_list-3.png	Graph: iterations that can run (protected) without failure
+  * lab2_list-4.png	Graph: cost per operation vs the number of threads for the various synchronization options
+
+  * Makefile		Supports 7 options: build (default)	builds the executables
+    				   	    tests 		runs clean-csv tests-add-all and tests-list-all
+					    tests-add-all	runs tests for lab2_add
+					    tests-list-all	runs tests for lab2_list
+					    graphs		runs tests then creates graphs
+					    dist		runs graphs then creates the tarball
+					    clean		removes executable files
+					    clean-csv		removes csv files created by graphs
+					    
+  * README		Contains file descriptions and short response answers
+
+QUESTIONS
+---------
+2.1.1) Causing Conflicts
+
+       It takes many iterations before errors are seen because higher iterations means longer jobs. When
+       the time required for a thread to finish its job exceeds one time slice, threads can no longer
+       finish their job without being interrupted. These interrupts result in race conditions that cause errors.
+
+       Errors become more rare when there is a significantly smaller number of iterations because less
+       iterations means shorter jobs. When jobs become short enough to fit within one time slice, threads are
+       able to finish their entire job without being interrupted, effectively eliminating race condition issues.
+
+       Furthermore, when jobs are longer than one time slice, a higher number of iterations means more chances
+       for two threads to overwrite eachother and cause an error. 
+
+2.1.2) Cost of Yielding
+
+       Yield runs are so much slower because each yield involves an interrupt and a context switch to a new
+       thread, both of which take time to execute.
+
+       The additional time goes towards the interrupt and context switch system calls.
+
+       It is impossible to get valid per-operation timings with the --yield option, because it is impossible
+       to calculate the time it takes to switch from thread to thread.
+
+2.1.3) Measurement Errors
+
+       The average cost of operation drops with increasing iterations because iterations are cheap and
+       thread creation is expensive. The additional iterations thus balance out the overhead costs of
+       creating the threads and thus reduce average costs per operation.
+
+       The cost per operation reduces exponentially with increasing iterations, and will likely stabilize
+       as number of iterations increase. A good way to test this would be to run a test with a set number
+       of threads and an extremely high number of iterations (i.e. 1000000). The high number of iterations
+       will balance out the thread creation overhead and give us a good cost-per-iteration estimate.
+
+2.1.4) Costs of Serialization
+
+       Fewer threads means threads will spend less time waiting for other threads to finish executing a
+       critical section. Less time waiting means less overhead, so when thread count is low all options
+       will be roughly the same. 
+
+       With more threads comes more overhead and time spent waiting in locks. At that point, the differences in
+       overhead requirements will result in slower performance as the synchronized options all involve
+       locks that require a thread to wait while another thread executes a job, slowing down runtime.
+
+2.2.1) Scalability of Mutex
+
+       In Part 1, an increase in the number of threads results in a linear increase in the cost of
+       mutex-protected operations, while in part 2 an increase in thread count didn't affect the cost
+       of mutex-protected operations.
+
+       This is likely due to the fact that linked-list operations take longer than addition operations, so
+       they require longer lock times and less frequent context switches. This reduces the impact of
+       mutex-lock overhead on overall runtime, resulting in a more flat shape.
+
+2.2.2) Scalability of Spin Locks
+
+       Spin locks are cheaper than mutexes for a lower number of threads, while mutexes are cheaper than spin
+       locks for a higher number of threads.
+
+       This is because spin locks have more overhead as the CPU needs to spend processing power on looping until
+       the lock is released, while mutexes don't require any processing power from the CPU while locked. Furthermore,
+       spin lock overhead increases with thread count, as a higher thread count means more spinning threads, while a
+       mutex lock's overhead doesn't increase nearly as much with additional threads as it simply involves putting
+       a thread to sleep. 

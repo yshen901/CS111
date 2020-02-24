@@ -1,0 +1,43 @@
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+void add(long long *pointer, long long value) {
+  long long sum = *pointer + value;
+  *pointer = sum;
+}
+
+int main(int argc, char ** argv) {
+  char c;
+  int option_index = 0;
+
+  int num_threads, num_iter;
+  pthread_t tid[20];
+  long long counter = 0;
+  
+  static struct option long_options[] = {
+    {"threads", required_argument, 0, 't'},
+    {"iterations", required_argument, 0, 'i'},
+    {0,0,0,0}
+  };
+
+  while((c = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
+    switch(c) {
+    case 't':
+      num_threads = atoi(optarg);
+      break;
+    case 'i':
+      num_iter = atoi(optarg);
+      break;
+    case '?':
+    default:
+      fprintf(stderr, "ERROR processing arguments, please use --threads={num_threads} or --iterations={num_iterations}\n");
+      exit(1);
+    }
+  }
+
+  printf("%d, %d", num_threads, num_iter);
+  exit(0);
+}
