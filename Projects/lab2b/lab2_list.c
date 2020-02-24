@@ -60,38 +60,111 @@ void handle_segfault(int signum) {
   }
 }
 
-int hash_func(char* key) {
+int get_list(char* key) {
   long hashed_num = 0;
   for (int i = 0; i < 8; i++)
     hashed_num *= (long) key[i];
   return (int)(hashed_num % num_lists);
 }
 
+/* Protected System Calls  */
+void safe_clock_gettime(struct timespec* time) {
+  if(clock_gettime(CLOCK_MONOTONIC, time) != 0) {
+    fprintf(stderr, "ERROR gettime failed: %s\n", strerror(errno));
+    exit(1);
+  }
+}
+
 /* THREAD FUNCTIONS */
 void* thread_func(void *args) {
   int offset = *(int*)args;
-  int length;
-  char key[64];
   SortedListElement_t *current;
+  struct timespec start_time, end_time;
+  
+  int length = 0;
+  long mutex_time = 0;
+  char key[64];
   int list = 0;
 
-  if (opt_sync == 's')
-    while(__sync_lock_test_and_set(s_lock + list, 1));
-  if (opt_sync == 'm')
-    pthread_mutex_lock(m_lock + list);
-
-  for (int i = offset; i < offset + num_iters; i++)
-    SortedList_insert(head, &elements[i]);
+  // For list insertion: lock the list you are inserting into
+  for (int i = offset; i < offset + num_iters; i++) {
+    strcpy(key, elements[i].key);
+    list = get_list(key);
     
-  length = SortedList_length(head);
-  if (length < num_iters) {
-    fprintf(stderr, "ERROR items have not been inserted properly and atomically\n");
-    exit(2);
+    if (opt_sync == 's')
+      while(__sync_lock_test_and_set(s_lock + list, 1));
+    if (opt_sync == 'm') {
+        if(clock_gettime(CLOCK_MONOTONIC, &start_time) != 0) {
+	  fprintf(stderr, "ERROR gettime failed: %s\n", strerror(errno));
+	  exit(1);
+	}
+	pthread_mutex_lock(m_lock + list);
+        if(clock_gettime(CLOCK_MONOTONIC, &end_time) != 0) {
+	  fprintf(stderr, "ERROR gettime failed: %s\n", strerror(errno));
+	  exit(1);
+	}
+	mutex_time += 1000000000L * (end_time.tv_sec - start_time.tv_sec) + end_time.tv_nsec - start_time.tv_nsec;
+    }
+
+    SortedList_insert(head + list, elements + i);
+
+    if (opt_sync == 's')
+      __sync_lock_release(s_lock + list);
+    if (opt_sync == 'm')
+      pthread_mutex_unlock(m_lock + list);
   }
 
-  for (int i = 0; i < num_iters; i++) {
-    strcpy(key, (elements + i + offset)->key);
-    if ((current = SortedList_lookup(head, key)) == NULL) {
+  // For list length: lock all lists before checking
+  for (list = 0; list < num_lists; list++) {
+    if (opt_sync == 's')
+      while(__sync_lock_test_and_set(s_lock + list, 1));
+    if (opt_sync == 'm') {
+        if(clock_gettime(CLOCK_MONOTONIC, &start_time) != 0) {
+	  fprintf(stderr, "ERROR gettime failed: %s\n", strerror(errno));
+	  exit(1);
+	}
+	pthread_mutex_lock(m_lock + list);
+        if(clock_gettime(CLOCK_MONOTONIC, &end_time) != 0) {
+	  fprintf(stderr, "ERROR gettime failed: %s\n", strerror(errno));
+	  exit(1);
+	}
+	mutex_time += 1000000000L * (end_time.tv_sec - start_time.tv_sec) + end_time.tv_nsec - start_time.tv_nsec;
+    }
+  }
+  for (list = 0; list < num_lists; list++)
+    length += SortedList_length(head + list);
+  if (length < num_iters) {
+    fprintf(stderr, "ERROR items have not been inserted property and atomically\n");
+    exit(2);
+  }
+  for (list = 0; list < num_lists; list++) {
+    if (opt_sync == 's')
+      __sync_lock_release(s_lock + list);
+    if (opt_sync == 'm')
+      pthread_mutex_unlock(m_lock + list);
+  }
+
+  // For deleting elements: lock the list you are searching in
+  for (int i = offset; i < offset + num_iters; i++) {
+    strcpy(key, elements[i].key);
+    list = get_list(key);
+    
+    if (opt_sync == 's')
+      while(__sync_lock_test_and_set(s_lock + list, 1));
+    if (opt_sync == 'm') {
+        if(clock_gettime(CLOCK_MONOTONIC, &start_time) != 0) {
+	  fprintf(stderr, "ERROR gettime failed: %s\n", strerror(errno));
+	  exit(1);
+	}
+	pthread_mutex_lock(m_lock + list);
+        if(clock_gettime(CLOCK_MONOTONIC, &end_time) != 0) {
+	  fprintf(stderr, "ERROR gettime failed: %s\n", strerror(errno));
+	  exit(1);
+	}
+	mutex_time += 1000000000L * (end_time.tv_sec - start_time.tv_sec) + end_time.tv_nsec - start_time.tv_nsec;
+    }
+
+    if ((current = SortedList_lookup(head + list, key)) == NULL) {
       fprintf(stderr, "ERROR element could not be found\n");
       exit(2);
     }
@@ -100,15 +173,14 @@ void* thread_func(void *args) {
       fprintf(stderr, "ERROR element could not be deleted\n");
       exit(2);
     }
+    
+    if (opt_sync == 's')
+      __sync_lock_release(s_lock + list);
+    if (opt_sync == 'm')
+      pthread_mutex_unlock(m_lock + list);    
   }
 
-  if (opt_sync == 's')
-    __sync_lock_release(s_lock + list);
-  if (opt_sync == 'm')
-    pthread_mutex_unlock(m_lock + list);
-  
   return NULL;
-  
 }
 
 int main(int argc, char ** argv) {
