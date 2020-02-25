@@ -17,11 +17,12 @@ int num_iters;
 int opt_yield;
 int num_lists;
 char opt_sync;
+long long lock_time;
 SortedList_t *head;
 SortedListElement_t *elements;
 
 /* HELPER FUNCTIONS */
-void printCSV(int num_threads, long num_ops, long total_time, long avg_optime) {
+void printCSV(int num_threads, long num_ops, long total_time, long avg_optime, long long avg_lock_time) {
   char name [50] = "list";
   if (opt_yield == 0)
     strcat(name, "-none");
@@ -49,8 +50,8 @@ void printCSV(int num_threads, long num_ops, long total_time, long avg_optime) {
   else
     strcat(name, "-none");
 
-  printf("%s,%d,%d,%d,%ld,%ld,%ld\n",
-	 name, num_threads, num_iters, num_lists, num_ops, total_time, avg_optime);
+  printf("%s,%d,%d,%d,%ld,%ld,%ld, %lld\n",
+	 name, num_threads, num_iters, num_lists, num_ops, total_time, avg_optime, avg_lock_time);
 }
 
 void handle_segfault(int signum) {
@@ -60,11 +61,8 @@ void handle_segfault(int signum) {
   }
 }
 
-int get_list(char* key) {
-  long hashed_num = 0;
-  for (int i = 0; i < 8; i++)
-    hashed_num *= (long) key[i];
-  return (int)(hashed_num % num_lists);
+int get_list(const char* key) {
+  return key[0] % num_lists;
 }
 
 /* Protected System Calls  */
@@ -98,30 +96,21 @@ void* thread_func(void *args) {
   struct timespec start_time, end_time;
   
   int length = 0;
-  long lock_time = 0;
   char key[64];
   int list = 0;
 
   // For list insertion: lock the list you are inserting into
-  printf("Offset: %d, num_iters: %d\n", offset, num_iters);
   for (int i = offset; i < offset + num_iters; i++) {
-    printf("%d", i);
-    strcpy(key, elements[i].key);
-    list = get_list(key);
+    list = get_list(elements[i].key);
 
     safe_clock_gettime(&start_time);
     lock(list);
     safe_clock_gettime(&end_time);
     lock_time += 1000000000L * (end_time.tv_sec - start_time.tv_sec) + end_time.tv_nsec - start_time.tv_nsec;
     
-    printf("locked\n");
     SortedList_insert(head + list, elements + i);
-    printf("inserted\n");
     unlock(list);
-    printf("unlocked\n");
-    printf("Iteration Finished: %d\n", i - offset);
   }
-  printf("Passed insertion\n");
 
   // For list length: lock all lists before checking
   for (list = 0; list < num_lists; list++) {
@@ -138,7 +127,6 @@ void* thread_func(void *args) {
   }
   for (list = 0; list < num_lists; list++)
     unlock(list);
-  printf("Passed length");
 
   // For deleting elements: lock the list you are searching in
   for (int i = offset; i < offset + num_iters; i++) {
@@ -162,7 +150,6 @@ void* thread_func(void *args) {
 
     unlock(list);
   }
-  printf("Passed deletion");
 
   return NULL;
 }
@@ -178,6 +165,7 @@ int main(int argc, char ** argv) {
 
   int num_threads = 1;
   num_lists = 1;
+  lock_time = 0;
   pthread_t *tid;
   
   struct timespec start_time, end_time;
@@ -203,6 +191,7 @@ int main(int argc, char ** argv) {
       break;
     case 'l':
       num_lists = atoi(optarg);
+      printf("Lists\n");
       break;
     case 'y':
       for (int i = 0; i < (int)strlen(optarg); i++) {
@@ -246,8 +235,8 @@ int main(int argc, char ** argv) {
   // Initialize the heads of several circular doubly linked lists
   head = malloc(sizeof(SortedList_t) * num_lists);
   for (int i = 0; i < num_lists; i++) {
-    head[i].next = head[i];
-    head[i].prev = head[i];
+    head[i].next = head + i;
+    head[i].prev = head + i;
     head[i].key = NULL;
   }
 
@@ -356,7 +345,8 @@ int main(int argc, char ** argv) {
   long long num_ops = num_threads * num_iters * 3;
   long total_time = 1000000000L * (end_time.tv_sec - start_time.tv_sec) + end_time.tv_nsec - start_time.tv_nsec;
   long avg_optime = total_time / num_ops;
-  printCSV(num_threads, num_ops, total_time, avg_optime);
+  long long avg_lock_time = lock_time / num_ops;
+  printCSV(num_threads, num_ops, total_time, avg_optime, avg_lock_time);
   
   // Free relevant values and exit
   free(elements);
