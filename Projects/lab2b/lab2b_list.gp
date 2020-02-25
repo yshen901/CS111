@@ -59,29 +59,29 @@ set output 'lab2b_2.png'
 plot \
      "< grep 'list-none-m,[0-9]*,1000,1,' lab2b_list.csv" using ($2):($7) \
 	title 'Average Time per Operation' with linespoints lc rgb 'red', \
-     "< grep 'list-none-m,[0-9]*,1000,1,' lab2b_list.csv" using ($2):($7) \
+     "< grep 'list-none-m,[0-9]*,1000,1,' lab2b_list.csv" using ($2):($8) \
 	title 'Average Mutex Wait Time' with linespoints lc rgb 'blue', \
 
 # lab2b_3.png
 set title "List-3: Successful Iterations vs. # of Threads"
 set logscale x 2
-set xrange [0:75]
+set xrange [0.75:]
 set xlabel "# of Threads"
 set ylabel "Successful Iterations"
 set logscale y 10
 set output 'lab2b_3.png'
 plot \
-    "< grep list-id-none lab2b_list.csv" using ($2):($3) \
-	title 'Unprotected' with points lc rgb "red", \
     "< grep list-id-s lab2b_list.csv" using ($2):($3) \
 	title 'Spin-Lock' with points lc rgb "blue", \
     "< grep list-id-m lab2b_list.csv" using ($2):($3) \
-	title 'Mutex' with points lc rgb "green", \
+	title 'Mutex' with points lc rgb "red", \
+    "< grep list-id-none lab2b_list.csv" using ($2):($3) \
+	title 'Unprotected' with points lc rgb "green", \
 
 # lab2b_4.png
 set title "List-4: Throughput vs. # of Threads for Partioned Lists using Mutex"
 set logscale x 2
-set xrange [0:75]
+set xrange [0.75:]
 set xlabel "# of Threads"
 set ylabel "Throughput"
 set logscale y 10
@@ -94,16 +94,16 @@ plot \
      "< grep 'list-none-m,[0-9]*,1000,8,' lab2b_list.csv" using ($2):(1000000000/($7)) \
 	title 'Lists = 8' with linespoints lc rgb 'green', \
      "< grep 'list-none-m,[0-9]*,1000,16,' lab2b_list.csv" using ($2):(1000000000/($7)) \
-	title 'Lists = 16' with linespoints lc rgb 'yellow', \
+	title 'Lists = 16' with linespoints lc rgb 'purple', \
 
 # lab2_5.png
-set title "List-4: Throughput vs. # of Threads for Partioned Lists using Spin-Lock"
+set title "List-5: Throughput vs. # of Threads for Partioned Lists using Spin-Lock"
 set logscale x 2
-set xrange [0:75]
+set xrange [0.75:]
 set xlabel "# of Threads"
 set ylabel "Throughput"
 set logscale y 10
-set output 'lab2b_4.png'
+set output 'lab2b_5.png'
 plot \
      "< grep 'list-none-s,[0-9]*,1000,1,' lab2b_list.csv" using ($2):(1000000000/($7)) \
 	title 'Lists = 1' with linespoints lc rgb 'red', \
@@ -112,5 +112,5 @@ plot \
      "< grep 'list-none-s,[0-9]*,1000,8,' lab2b_list.csv" using ($2):(1000000000/($7)) \
 	title 'Lists = 8' with linespoints lc rgb 'green', \
      "< grep 'list-none-s,[0-9]*,1000,16,' lab2b_list.csv" using ($2):(1000000000/($7)) \
-	title 'Lists = 16' with linespoints lc rgb 'yellow', \
+	title 'Lists = 16' with linespoints lc rgb 'purple', \
 

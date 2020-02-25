@@ -191,7 +191,6 @@ int main(int argc, char ** argv) {
       break;
     case 'l':
       num_lists = atoi(optarg);
-      printf("Lists\n");
       break;
     case 'y':
       for (int i = 0; i < (int)strlen(optarg); i++) {
