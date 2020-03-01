@@ -11,6 +11,7 @@
 #include <sys/time.h>
 #include <ctype.h>
 #include <mraa.h>
+#include <getopt.h>
 
 int period;
 char scale;
@@ -21,19 +22,22 @@ mraa_aio_context thermometer;
 mraa_gpio_context button;
 
 
+/* SHUTS OFF THE SYSTEM */
+void shutdown() {
+  run_flag = 0;
+}
+
+/* READS THE TEMPERATURE */
 float read_temp() {
-
+  return 1.0;
 }
 
-/*
-  Processes the folowing options:
-    SCALE=F, SCALE=C, PERIOD=seconds, STOP, START, LOG <line of text>, and OFF
-*/
+/* SCALE=F, SCALE=C, PERIOD=seconds, STOP, START, LOG <line of text>, and OFF */
 void process_input(const char* input) {
-  
-
+  printf(input);
 }
 
+/* HELPER FUNCTIONS FOR ERRORS */
 void syscall_error(const char* err_mess) {
   fprintf(stderr, err_mess);
   exit(1);
@@ -42,9 +46,11 @@ void syscall_error(const char* err_mess) {
 void mraa_error(const char* err_mess) {
   fprintf(stderr, err_mess);
   mraa_deinit();
-  return EXIT_FAILURE;
+  exit(1);
 }
 
+
+/* MAIN FUNCTION */
 int main (int argc, char** argv) {
   char c;
   period = 1;
@@ -87,7 +93,7 @@ int main (int argc, char** argv) {
   if ((button = mraa_gpio_init(60)) == NULL)
     mraa_error("ERROR initializing button");
   mraa_gpio_dir(button, MRAA_GPIO_IN);
-  mraa_gpio_isr(button, MRAA_GPIO_EDGE_RISING, &shutdown);
+  mraa_gpio_isr(button, MRAA_GPIO_EDGE_RISING, &shutdown, NULL);
 
   struct pollfd poll;
   poll.fd = STDIN_FILENO;
