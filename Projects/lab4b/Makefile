@@ -6,7 +6,7 @@ CC = gcc
 CFLAGS = -g -Wall -Wextra
 ID = 604836772
 ARCHIVE = lab4b-$(ID).tar.gz
-SOURCES = lab4b.c Makefile
+SOURCES = lab4b.c Makefile README
 
 build:
 	@$(CC) $(CFLAGS) -o lab4b lab4b.c -lm -lmraa
@@ -14,5 +14,8 @@ build:
 dist:
 	@tar -czvf $(ARCHIVE) $(SOURCES)
 
+check:
+	
+
 clean:
-	@rm -f lab4a
+	@rm -f lab4b

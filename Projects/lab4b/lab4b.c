@@ -29,7 +29,7 @@ mraa_gpio_context button;
 
 void syscall_error(const char* error_message);
 void log_str(const char* message);
-
+void button_func();
 
 /* READS THE TEMPERATURE */
 float read_temp() {
@@ -49,36 +49,39 @@ void handle_command(char c, int* i) {
   case 'F':
     scale = 'F';
     *i += 7;
-    log("SCALE=F\n");
+    log_str("SCALE=F\n");
     break;
   case 'C':
     scale = 'C';
     *i += 7;
-    log("SCALE=C\n");
+    log_str("SCALE=C\n");
     break;
   case 'S':
+    printf("STOPPED\n");
     if(start_flag == 1) {
       start_flag = 0;
       *i += 4;
-      log("STOP\n");
     }
+    log_str("STOP\n");
     break;
   case 'G':
     if(start_flag == 0) {
       start_flag = 1;
-      *i += 5;
-      log("START\n");
+      *i += 5; 
     }
+    log_str("START\n");
     break;
-  }
   case 'O':
-    log("OFF\n");
+    log_str("OFF\n");
     button_func();
     break;
+  default:
+    syscall_error("ERROR wrong command\n");
+  }	
 }
 
 /* STDIN PROCESSOR */
-void log_str(const char* message) {
+void log_str(const char* mess) {
   if (log_file)
     fprintf(log_file, "%s", mess);
   else
@@ -92,22 +95,25 @@ void process_input() {
   if (input_len == -1)
     syscall_error("ERROR reading input\n");
 
+  input_buff[input_len] = '\0'; //AVOIDS OVERFLOW ISSUE 
   //int end, valid;
-  for (int i = 0; i < input_len; i++) {
-    if(strcmp(input_buff+i, "SCALE=F" == 0)) {
+  int i;
+  int j;
+  for (i = 0; i < input_len; i++) { 
+    if(strncmp(input_buff+i, "SCALE=F", 7) == 0) 
       handle_command('F', &i);
-    else if(strcmp(input_buff+i, "SCALE=C") == 0) 
+    else if(strncmp(input_buff+i, "SCALE=C", 7) == 0) 
       handle_command('C', &i);
-    else if(strcmp(input_buff+i, "STOP") == 0)
+    else if(strncmp(input_buff+i, "STOP", 4) == 0)
       handle_command('S', &i);
-    else if (strcmp(input_buff+i, "START") == 0)
+    else if (strncmp(input_buff+i, "START", 5) == 0)
       handle_command('G', &i);
-    else if (strcmp(input_buff+i, "OFF") == 0)
+    else if (strncmp(input_buff+i, "OFF", 3) == 0)
       handle_command('O', &i);
-    else if (strcmp(input_buff+i, "PERIOD=") == 0) {
+    else if (strncmp(input_buff+i, "PERIOD=",7) == 0) {
       i += 7;
       if (isdigit(input_buff[i]))
-	period = atoi(input_buff[i]);
+	period = atoi(&input_buff[i]);
 
       if (log_file)
 	fprintf(log_file, "PERIOD=%c", input_buff[i]);
@@ -121,13 +127,16 @@ void process_input() {
 	  valid = 0;
       }*/
     }
-    else if (strcmp(input_buff+i, "LOG") == 0) {
+    else if (strncmp(input_buff+i, "LOG", 3) == 0) {
+      j = 0;
       while(input_buff[i] != '\n') {
-	log(&input_buff[i]);
+	log_buff[j] = input_buff[i];
 	i++;
+        j++;
       }
-      log("\n");
-      i++;
+      log_buff[j] = '\n';
+      log_buff[j+1] = '\0';
+      log_str(log_buff);
     }
   } 
   return;  
@@ -215,7 +224,7 @@ int main (int argc, char** argv) {
   
   static struct option long_options[] = {
     {"period", required_argument, 0, 'p'},
-    {"scale", required_argument, 0, 'c'},
+    {"scale", required_argument, 0, 's'},
     {"log", required_argument, 0, 'l'},
     {0, 0, 0, 0}
   };
