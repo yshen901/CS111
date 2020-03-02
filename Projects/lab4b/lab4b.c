@@ -34,7 +34,7 @@ float read_temp() {
   float R = 1023.0/temp - 1.0;
   R *= R0;
   
-  float temp_c = 1.0/(log(R/R0)/Bx + 1/298.15) - 273.15;
+  float temp_c = 1.0/(log(R/R0)/B + 1/298.15) - 273.15;
   if (scale == 'F')
     return (temp_c * 9)/5 + 32;
   else
@@ -48,6 +48,7 @@ void process_input(const char* input) {
 
 /* HELPER FUNCTIONS FOR PRINTING */
 void print_time() {
+  time_t now;
   struct tm *mytime = localtime(&now);
   int temp = (int)(10*read_temp());
 
@@ -55,7 +56,7 @@ void print_time() {
   strftime(current_time, 9, "%H:%M:%S", mytime);
   printf("%s", current_time);
   if(log_fd > 0)
-    fprintf(log_fd, "%s", current_time);
+    write(log_fd, "%s", current_time);
 }
 
 void print_temp() {
@@ -63,7 +64,7 @@ void print_temp() {
 
   printf(" %d.%d\n", temp/10, temp%10);
   if(log_fd > 0)
-    fprintf(log_fd, " %d.%d\n", temp/10, temp%10);
+    write(log_fd, " %d.%d\n", temp/10, temp%10);
 }
 
 void print_timestamp() {
@@ -81,12 +82,12 @@ void shutdown() {
   print_time();
   printf(" SHUTDOWN\n");
   if(log_fd > 0)
-    fprintf(log_fd, " SHUTDOWN\n");
+    write(log_fd, " SHUTDOWN\n");
 }
 
 void close_mraa() {
-  mraa_aio_close(button);
-  mraa_gpio_close(thermometer);
+  mraa_gpio_close(button);
+  mraa_aio_close(thermometer);
 }
 
 void button_func() {
@@ -125,7 +126,7 @@ int main (int argc, char** argv) {
     {0, 0, 0, 0}
   };
 
-  while ((c = gettopt_long(argc, argv, "", long_options, &option_index)) != -1) {
+  while ((c = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
     switch(c) {
     case 'p':
       period = atoi(optarg);
@@ -170,6 +171,6 @@ int main (int argc, char** argv) {
     print_timestamp();
     if ((input = poll(keyboard, 1, 0)) < 0) 
       syscall_error("ERROR polling the keyboard\n");
-    process_input();
+    process_input("boom");
   }
 }
