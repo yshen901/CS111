@@ -18,7 +18,7 @@
 
 int period;
 char scale;
-int log_fd;
+FILE* log_file;
 int run_flag;
 int start_flag;
 char* std_input;
@@ -52,19 +52,19 @@ void print_time() {
   struct tm *mytime = localtime(&now);
   int temp = (int)(10*read_temp());
 
-  char current_time[9];
-  strftime(current_time, 9, "%H:%M:%S", mytime);
+  char current_time[10];
+  strftime(current_time, 10, "%H:%M:%S", mytime);
   printf("%s", current_time);
-  if(log_fd > 0)
-    write(log_fd, "%s", current_time);
+  if(log_file)
+    fprintf(log_file, "%s", current_time);
 }
 
 void print_temp() {
   int temp = (int)(10*read_temp());
 
   printf(" %d.%d\n", temp/10, temp%10);
-  if(log_fd > 0)
-    write(log_fd, " %d.%d\n", temp/10, temp%10);
+  if(log_file)
+    fprintf(log_file, " %d.%d\n", temp/10, temp%10);
 }
 
 void print_timestamp() {
@@ -81,8 +81,8 @@ void print_timestamp() {
 void shutdown() {
   print_time();
   printf(" SHUTDOWN\n");
-  if(log_fd > 0)
-    write(log_fd, " SHUTDOWN\n");
+  if(log_file)
+    fprintf(log_file, " SHUTDOWN\n");
 }
 
 void close_mraa() {
@@ -118,6 +118,7 @@ int main (int argc, char** argv) {
   scale = 'F';
   run_flag = 1;
   start_flag = 1;
+  log_file = NULL;
   
   static struct option long_options[] = {
     {"period", required_argument, 0, 'p'},
@@ -139,8 +140,8 @@ int main (int argc, char** argv) {
 	syscall_error("ERROR invalid scale, please input either C or F\n");
       break;
     case 'l':
-      log_fd = open(optarg, O_RDWR | O_APPEND | O_CREAT, 0666);
-      if (log_fd <= 0 )
+      log_file = fopen(optarg, "w+");
+      if (log_file == NULL)
 	syscall_error("ERROR opening/creating logfile\n");
       break;
     default:
