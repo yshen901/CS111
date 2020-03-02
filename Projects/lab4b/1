@@ -23,11 +23,10 @@ int run_flag;
 int start_flag;
 char* std_input;
 
-time_t last_timestamp;
+time_t last_timestamp = 0;
 mraa_aio_context thermometer;
 mraa_gpio_context button;
 
-void syscall_error(const char* error_message);
 
 /* READS THE TEMPERATURE */
 float read_temp() {
@@ -42,40 +41,16 @@ float read_temp() {
     return temp_c;
 }
 
-void handle_command(char c) {
-  switch(c) {
-
-
-
-
-  }
-
-
-}
-
 /* STDIN PROCESSOR */
-void process_input() {
-  char input_buff [4096];
-  int input_len = read(STDIN_FILENO, input_buff, 4096);
-  if (input_len == -1)
-    syscall_error("ERROR reading input\n");
-
-  for (int i = 0; i < input_len; i++) {
-    if(strcmp(input_buff+i, "SCALE=F" == 0)) {
-      printf("S   
-    }
-    else if(strcmp(input_buff+i, "SCALE=C") == 0) {
-
-    }
-
-  } 
-  return;  
+void process_input(const char* input) {
+  printf(input);
 }
 
 /* HELPER FUNCTIONS FOR PRINTING */
 void print_time() {
-  time_t now = time(NULL);
+  time_t now;
   struct tm *mytime = localtime(&now);
+  int temp = (int)(10*read_temp());
 
   char current_time[10];
   strftime(current_time, 10, "%H:%M:%S", mytime);
@@ -95,25 +70,19 @@ void print_temp() {
 void print_timestamp() {
   if (start_flag == 0)
     return;
-  
-  time_t now = time(NULL);
-  if (now - last_timestamp < period) {
-    // printf("Currrent Time: %ld\nNext Time: %ld\n\n", (long)now, (long)last_timestamp);
+  if (time(NULL) - last_timestamp < period)
     return;
-  }
 
   print_time();
   print_temp();
-  time(&last_timestamp);
 }
 
 /* FUNCTIONS FOR SYSTEM SHUTDOWN */
-void shutdown() { 
+void shutdown() {
   print_time();
   printf(" SHUTDOWN\n");
   if(log_file)
     fprintf(log_file, " SHUTDOWN\n");
-  exit(0);
 }
 
 void close_mraa() {
@@ -146,11 +115,10 @@ int main (int argc, char** argv) {
   int option_index;
   
   period = 1;
-  scale = 'C';
+  scale = 'F';
   run_flag = 1;
   start_flag = 1;
   log_file = NULL;
-  last_timestamp = time(NULL);
   
   static struct option long_options[] = {
     {"period", required_argument, 0, 'p'},
@@ -199,13 +167,11 @@ int main (int argc, char** argv) {
   if ((std_input = (char*) malloc(4096 * sizeof(char))) == NULL)
     syscall_error("ERROR allocating memory for stdio\n");
 
-  int input = 0;
+  int input;
   while(run_flag) {
     print_timestamp();
-    input = poll(keyboard, 1, 0);
-    if (input) 
-      process_input();
+    if ((input = poll(keyboard, 1, 0)) < 0) 
+      syscall_error("ERROR polling the keyboard\n");
+    process_input("boom");
   }
-
-  return(0);
 }
