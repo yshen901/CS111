@@ -28,6 +28,8 @@ mraa_aio_context thermometer;
 mraa_gpio_context button;
 
 void syscall_error(const char* error_message);
+void log_str(const char* message);
+
 
 /* READS THE TEMPERATURE */
 float read_temp() {
@@ -42,32 +44,91 @@ float read_temp() {
     return temp_c;
 }
 
-void handle_command(char c) {
+void handle_command(char c, int* i) {
   switch(c) {
-
-
-
-
+  case 'F':
+    scale = 'F';
+    *i += 7;
+    log("SCALE=F\n");
+    break;
+  case 'C':
+    scale = 'C';
+    *i += 7;
+    log("SCALE=C\n");
+    break;
+  case 'S':
+    if(start_flag == 1) {
+      start_flag = 0;
+      *i += 4;
+      log("STOP\n");
+    }
+    break;
+  case 'G':
+    if(start_flag == 0) {
+      start_flag = 1;
+      *i += 5;
+      log("START\n");
+    }
+    break;
   }
-
-
+  case 'O':
+    log("OFF\n");
+    button_func();
+    break;
 }
 
 /* STDIN PROCESSOR */
+void log_str(const char* message) {
+  if (log_file)
+    fprintf(log_file, "%s", mess);
+  else
+    printf("%s", mess);
+}
+
 void process_input() {
   char input_buff [4096];
+  char log_buff[256];
   int input_len = read(STDIN_FILENO, input_buff, 4096);
   if (input_len == -1)
     syscall_error("ERROR reading input\n");
 
+  //int end, valid;
   for (int i = 0; i < input_len; i++) {
     if(strcmp(input_buff+i, "SCALE=F" == 0)) {
-      printf("S   
-    }
-    else if(strcmp(input_buff+i, "SCALE=C") == 0) {
+      handle_command('F', &i);
+    else if(strcmp(input_buff+i, "SCALE=C") == 0) 
+      handle_command('C', &i);
+    else if(strcmp(input_buff+i, "STOP") == 0)
+      handle_command('S', &i);
+    else if (strcmp(input_buff+i, "START") == 0)
+      handle_command('G', &i);
+    else if (strcmp(input_buff+i, "OFF") == 0)
+      handle_command('O', &i);
+    else if (strcmp(input_buff+i, "PERIOD=") == 0) {
+      i += 7;
+      if (isdigit(input_buff[i]))
+	period = atoi(input_buff[i]);
 
+      if (log_file)
+	fprintf(log_file, "PERIOD=%c", input_buff[i]);
+      else
+	printf("PERIOD=%c", input_buff[i]);
+      
+      /*end = i;
+      valid = 1;
+      while (end < input_len && input_buff[end] != '\n') {
+	if (!isdigit(input_buff[end]))
+	  valid = 0;
+      }*/
     }
-
+    else if (strcmp(input_buff+i, "LOG") == 0) {
+      while(input_buff[i] != '\n') {
+	log(&input_buff[i]);
+	i++;
+      }
+      log("\n");
+      i++;
+    }
   } 
   return;  
 }
