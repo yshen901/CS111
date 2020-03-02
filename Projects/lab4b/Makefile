@@ -15,6 +15,7 @@ dist:
 	@tar -czvf $(ARCHIVE) $(SOURCES)
 
 check:
+	@chmod +x smoketest.sh
 	./smoketest.sh
 clean:
 	@rm -f lab4b log.txt $(ARCHIVE)
