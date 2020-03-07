@@ -109,6 +109,25 @@ void time_csv(time_t unformatted_time, char* formatted_time) {
   strftime(formatted_time, 80, "%m/%d/%y %H:%M:%S", &temp_ts);
 }
 
+void directory_summary(uint32_t block_number, uint32_t inode_number) {
+  struct ext2_dir_entry directory;
+  uint32_t offset = 1024 + (block_number - 1) * blocks_size;
+  uint32_t i;
+
+  for (i = 0; i < blocks_size; i += directory.rec_len) {
+    pread(img_fd, &directory, sizeof(directory), i + offset);
+    if (directory.inode == 0)
+      continue;
+    fprintf(stdout, "DIRENT,%u,%u,%u,%u,%u,'%s'\n",
+	    inode_number,
+	    i,
+	    directory.inode,
+	    directory.rec_len,
+	    directory.name_len,
+	    directory.name);
+  }
+}
+
 void used_inode_summary(uint32_t index, uint32_t inode_number) {
   struct ext2_inode inode;
   char file_type;
@@ -152,10 +171,10 @@ void used_inode_summary(uint32_t index, uint32_t inode_number) {
   }
   fprintf(stdout, "\n");
 
-  /*for (i = 0; i < 12; i++) {
+  for (i = 0; i < 12; i++) {
     if (inode.i_block[i] != 0 && file_type == 'd')
       directory_summary(inode.i_block[i], inode_number);
-      }*/
+  }
 }
 
 void inodes_summary(uint32_t group_number) {
@@ -171,7 +190,16 @@ void inodes_summary(uint32_t group_number) {
     for (j = 0; j < 8; j++) {
       if((u_flags & 1) == 0)
 	fprintf(stdout, "IFREE,%d\n", index);
-      else
+      index++;
+      u_flags >>= 1;
+    }
+  }
+
+  index = group_number * inodes_per_group + 1;
+  for (i = 0; i < num_chunks; i++) {
+    u_flags = chunks[i];
+    for (j = 0; j < 8; j++) {
+      if((u_flags & 1) == 1)
         used_inode_summary(index, index - group_number * superblock.s_inodes_per_group + 1);
       index++;
       u_flags >>= 1;
