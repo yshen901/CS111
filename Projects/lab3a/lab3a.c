@@ -118,13 +118,45 @@ void directory_summary(uint32_t block_number, uint32_t inode_number) {
     pread(img_fd, &directory, sizeof(directory), i + offset);
     if (directory.inode == 0)
       continue;
-    fprintf(stdout, "DIRENT,%u,%u,%u,%u,%u,'%s'\n",
+    fprintf(stdout, "DIRENT,%d,%d,%d,%d,%d,'%s'\n",
 	    inode_number,
 	    i,
 	    directory.inode,
 	    directory.rec_len,
 	    directory.name_len,
 	    directory.name);
+  }
+}
+
+void indirect_block_summary(uint32_t index, uint32_t inode_number, int type) {
+  uint32_t num_blocks = blocks_size / sizeof(uint32_t);
+  uint32_t blocks[num_blocks];
+  uint32_t i;
+  uint32_t offset;
+  if (type == 1)
+    offset = 12;
+  if (type == 2)
+    offset = 268;
+  if (type == 3)
+    offset = 65804;
+  
+  memset(blocks, 0, num_blocks);
+
+  pread(img_fd, blocks, blocks_size, 1024 + (inode_number - 1) * blocks_size);
+  
+  for (i = 0; i < num_blocks; i++) {
+    if (blocks[i] == 0)
+      continue;
+    fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n",
+	    index,
+	    type,
+	    offset,
+	    inode_number,
+	    blocks[i]);
+    if (type == 2)
+      indirect_block_summary(index, blocks[i], type-1);
+    else if (type == 3)
+      indirect_block_summary(index, blocks[i], type-1);
   }
 }
 
@@ -174,6 +206,11 @@ void used_inode_summary(uint32_t index, uint32_t inode_number) {
   for (i = 0; i < 12; i++) {
     if (inode.i_block[i] != 0 && file_type == 'd')
       directory_summary(inode.i_block[i], inode_number);
+  }
+
+  for (i = 12; i < 15; i++) {
+    if (inode.i_block[i] != 0)
+      indirect_block_summary(inode.i_block[i], inode_number, i + 1 - 12);
   }
 }
 
