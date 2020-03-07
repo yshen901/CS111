@@ -20,7 +20,7 @@
 
 int img_fd;
 struct ext2_super_block superblock;
-//struct ext2_group_desc group_descriptor;
+struct ext2_group_desc group_descriptor;
 
 uint32_t groups_count;
 uint32_t blocks_count;
@@ -52,7 +52,6 @@ void super_block_summary() {
   groups_count = blocks_count/blocks_per_group;
   if (blocks_count % blocks_per_group)
     groups_count++;
-  fprintf(stdout, "%d", groups_count);
   
   fprintf(stdout, "SUPERBLOCK,%d,%d,%d,%d,%d,%d,%d\n",
 	  blocks_count, inodes_count, blocks_size, inodes_size,
@@ -61,7 +60,6 @@ void super_block_summary() {
 
 void group_summary(uint32_t group_number) {
   uint32_t num_of_blocks, num_of_inodes;
-  struct ext2_group_desc group_descriptor;
 
   int offset = 1024 + blocks_size + group_number * sizeof(group_descriptor);
   pread(img_fd, &group_descriptor, sizeof(group_descriptor), offset);
@@ -88,17 +86,103 @@ void group_summary(uint32_t group_number) {
 }
 
 void free_blocks_summary(uint32_t group_number) {
-  printf("%d", group_number);
+  char chunks[blocks_size];
+  pread(img_fd, &chunks, blocks_size, 1024 + (group_descriptor.bg_block_bitmap-1)*blocks_size);
+  uint32_t index = superblock.s_first_data_block + group_number * blocks_per_group;
+
+  uint32_t i, j;
+  char u_flags;
+  for(i = 0; i < blocks_size; i++) {
+    u_flags = chunks[i];
+    for(j = 0; j < 8; j++) { //checks the first flag, then shifts the next flag so it's first
+      if((u_flags & 1) == 0) 
+	fprintf(stdout, "BFREE,%d\n", index);
+      u_flags >>= 1;
+      index++;
+    }
+  }
 }
 
-void free_inodes_summary(uint32_t group_number) {
-  printf("%d", group_number);
+void time_csv(time_t unformatted_time, char* formatted_time) {
+  time_t temp_time = unformatted_time;
+  struct tm temp_ts = *gmtime(&temp_time);
+  strftime(formatted_time, 80, "%m/%d/%y %H:%M:%S", &temp_ts);
+}
+
+void used_inode_summary(uint32_t index, uint32_t inode_number) {
+  struct ext2_inode inode;
+  char file_type;
+  char ctime[18], mtime[18], atime[18];
+  uint32_t i;
+  
+  pread(img_fd, &inode, sizeof(inode), group_descriptor.bg_inode_table * blocks_size + index * sizeof(inode));
+
+  if (inode.i_links_count == 0 || inode.i_mode == 0)
+    return;
+
+  if ((inode.i_mode & 0xA000) == 0xA000)
+    file_type = 's';
+  else if ((inode.i_mode & 0x4000) == 0x4000)
+    file_type = 'd';
+  else if ((inode.i_mode & 0x8000) == 0x8000)
+    file_type = 'f';
+  else
+    error_syscall("ERROR unsupported mode detected\n");
+  
+  time_csv(inode.i_ctime, ctime);
+  time_csv(inode.i_mtime, mtime);
+  time_csv(inode.i_atime, atime);
+
+  fprintf(stdout, "INODE,%d,%c,%o,%d,%d,%d,%s,%s,%s,%d,%d",
+	  inode_number,
+	  file_type,
+	  inode.i_mode & 0x0FFF,
+	  inode.i_uid,
+	  inode.i_gid,
+	  inode.i_links_count,
+	  ctime,
+	  mtime,
+	  atime,
+	  inode.i_size,
+	  inode.i_blocks);
+
+  if (file_type == 'f' || file_type == 'd' || (file_type == 's' && inode.i_size > 60)) {
+    for (i = 0; i < 15; i++)
+      fprintf(stdout, ",%d", inode.i_block[i]);
+  }
+  fprintf(stdout, "\n");
+
+  /*for (i = 0; i < 12; i++) {
+    if (inode.i_block[i] != 0 && file_type == 'd')
+      directory_summary(inode.i_block[i], inode_number);
+      }*/
+}
+
+void inodes_summary(uint32_t group_number) {
+  uint32_t num_chunks = inodes_per_group / 8;
+  char chunks[num_chunks];
+  uint32_t index = group_number * inodes_per_group + 1;
+  pread(img_fd, &chunks, num_chunks, 1024 + (group_descriptor.bg_inode_bitmap - 1)*blocks_size);
+
+  uint32_t i, j;
+  char u_flags;
+  for (i = 0; i < num_chunks; i++) {
+    u_flags = chunks[i];
+    for (j = 0; j < 8; j++) {
+      if((u_flags & 1) == 0)
+	fprintf(stdout, "IFREE,%d\n", index);
+      else
+        used_inode_summary(index, index - group_number * superblock.s_inodes_per_group + 1);
+      index++;
+      u_flags >>= 1;
+    }
+  }
 }
 
 void process_group(uint32_t group_number) {
   group_summary(group_number);
-  //free_blocks_summary(group_number);
-  //free_inodes_summary(group_number);
+  free_blocks_summary(group_number);
+  inodes_summary(group_number);
 }
 
 int main(int argc, char** argv) {
