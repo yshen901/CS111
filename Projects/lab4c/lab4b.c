@@ -39,7 +39,7 @@ mraa_aio_context thermometer;
 mraa_gpio_context button;
 
 void syscall_error(const char* error_message);
-void log_str(const char* message);
+void log_str(const char* message, int print_server);
 void button_func();
 
 /* READS THE TEMPERATURE */
@@ -93,7 +93,7 @@ void handle_command(char c, int* i) {
 /* STDIN PROCESSOR */
 void log_str(const char* mess, int print_server) {
   if (print_server == 1)
-    dprintf(sock_fd, "%s", mess)
+    dprintf(sock_fd, "%s", mess);
   if (log_file)
     fprintf(log_file, "%s", mess);
   printf("%s", mess);
@@ -159,7 +159,7 @@ void print_time() {
 
   char current_time[10];
   strftime(current_time, 10, "%H:%M:%S", mytime);
-  log_str(buff, 1);
+  log_str(current_time, 1);
 }
 
 void print_temp() {
@@ -188,7 +188,7 @@ void print_timestamp() {
 /* FUNCTIONS FOR SYSTEM SHUTDOWN */
 void shutdown() { 
   print_time();
-  log_str(" SHUTDOWN\n");
+  log_str(" SHUTDOWN\n", 1);
   exit(0);
 }
 
