@@ -34,7 +34,7 @@ struct hostent* server;
 int sock_fd;
 struct sockaddr_in serv_addr;
 
-time_t last_timestamp;
+time_t last_timestamp = 0;
 mraa_aio_context thermometer;
 mraa_gpio_context button;
 
@@ -174,15 +174,18 @@ void print_timestamp() {
   if (start_flag == 0)
     return;
   
-  time_t now = time(NULL);
-  if (now - last_timestamp < period) {
+  struct timeval now;
+  if(gettimeofday(&now, 0) < 0)
+    syscall_error("ERROR getting current time\n");
+  
+  if (now.tv_sec - last_timestamp < period) {
     // printf("Currrent Time: %ld\nNext Time: %ld\n\n", (long)now, (long)last_timestamp);
     return;
   }
 
   print_time();
   print_temp();
-  time(&last_timestamp);
+  last_timestamp = now.tv_sec;
 }
 
 /* FUNCTIONS FOR SYSTEM SHUTDOWN*/
@@ -308,7 +311,7 @@ int main (int argc, char** argv) {
     syscall_error("ERROR connecting to remote host\n");
 
   char mess[64];
-  sprintf(mess, "ID=%s", id);
+  sprintf(mess, "ID=%s\n", id);
   log_str(mess, 1);
   
   struct pollfd sock_poll[] = {
