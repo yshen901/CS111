@@ -22,6 +22,7 @@ int img_fd;
 struct ext2_super_block superblock;
 struct ext2_group_desc group_descriptor;
 
+/* Saves these values to make referencing them easier */
 uint32_t groups_count;
 uint32_t blocks_count;
 uint32_t inodes_count;
@@ -58,6 +59,7 @@ void super_block_summary() {
 	  blocks_per_group, inodes_per_group, first_free_inode);
 }
 
+/* PRINTS GROUP SUMMARRY */
 void group_summary(uint32_t group_number) {
   uint32_t num_of_blocks, num_of_inodes;
 
@@ -85,6 +87,7 @@ void group_summary(uint32_t group_number) {
 	  group_descriptor.bg_inode_table);
 }
 
+/* PRINTS AN ENTRY FOR EACH FREE BLOCK */
 void free_blocks_summary(uint32_t group_number) {
   char chunks[blocks_size];
   pread(img_fd, &chunks, blocks_size, 1024 + (group_descriptor.bg_block_bitmap-1)*blocks_size);
@@ -103,12 +106,14 @@ void free_blocks_summary(uint32_t group_number) {
   }
 }
 
+/* HELPER FUNCTION: CONVERTS A TIME_T OBJECT INTO A CSV OUTPUT */
 void time_csv(time_t unformatted_time, char* formatted_time) {
   time_t temp_time = unformatted_time;
   struct tm temp_ts = *gmtime(&temp_time);
   strftime(formatted_time, 80, "%m/%d/%y %H:%M:%S", &temp_ts);
 }
 
+/* HELPER FUNCTION: PRINTS DIRECTORY ENTRY  */
 void directory_summary(uint32_t block_number, uint32_t inode_number) {
   struct ext2_dir_entry directory;
   uint32_t offset = 1024 + (block_number - 1) * blocks_size;
@@ -128,38 +133,39 @@ void directory_summary(uint32_t block_number, uint32_t inode_number) {
   }
 }
 
-void indirect_block_summary(uint32_t index, uint32_t inode_number, int type) {
+
+/* HELPER FUNCTION TO RECURSIVELY OUTPUT INDIRECT BLOCKS */
+void indirect_block_summary(uint32_t index, uint32_t inode_number, int type, int offset) {
   uint32_t num_blocks = blocks_size / sizeof(uint32_t);
   uint32_t blocks[num_blocks];
   uint32_t i;
-  uint32_t offset;
-  if (type == 1)
-    offset = 12;
-  if (type == 2)
-    offset = 268;
-  if (type == 3)
-    offset = 65804;
   
   memset(blocks, 0, num_blocks);
+  pread(img_fd, blocks, blocks_size, 1024 + (index - 1) * blocks_size);
 
-  pread(img_fd, blocks, blocks_size, 1024 + (inode_number - 1) * blocks_size);
-  
+  // Recursively generate the indirect blocks, making sure to keep track of offsets during recursion
+  // and increment offset when necessary
   for (i = 0; i < num_blocks; i++) {
     if (blocks[i] == 0)
       continue;
     fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n",
-	    index,
-	    type,
-	    offset,
 	    inode_number,
+	    type,
+	    offset + i,
+	    index,
 	    blocks[i]);
-    if (type == 2)
-      indirect_block_summary(index, blocks[i], type-1);
-    else if (type == 3)
-      indirect_block_summary(index, blocks[i], type-1);
+    if (type == 2) {
+      indirect_block_summary(blocks[i], inode_number, type-1, offset);
+      offset += 256;
+    }
+    else if (type == 3) {
+      indirect_block_summary(blocks[i], inode_number, type-1, offset);
+      offset += 65536;
+    }
   }
 }
 
+/* HELPER FUNCTION TO PRINT OUT ENTRIES FOR USED INODE BLOCKS */
 void used_inode_summary(uint32_t index, uint32_t inode_number) {
   struct ext2_inode inode;
   char file_type;
@@ -171,6 +177,7 @@ void used_inode_summary(uint32_t index, uint32_t inode_number) {
   if (inode.i_links_count == 0 || inode.i_mode == 0)
     return;
 
+  // Get file type and format times
   if ((inode.i_mode & 0xA000) == 0xA000)
     file_type = 's';
   else if ((inode.i_mode & 0x4000) == 0x4000)
@@ -197,23 +204,29 @@ void used_inode_summary(uint32_t index, uint32_t inode_number) {
 	  inode.i_size,
 	  inode.i_blocks);
 
+  // Print the 15 block entries
   if (file_type == 'f' || file_type == 'd' || (file_type == 's' && inode.i_size > 60)) {
     for (i = 0; i < 15; i++)
       fprintf(stdout, ",%d", inode.i_block[i]);
   }
   fprintf(stdout, "\n");
 
+  // Print directory entries
   for (i = 0; i < 12; i++) {
     if (inode.i_block[i] != 0 && file_type == 'd')
       directory_summary(inode.i_block[i], inode_number);
   }
 
-  for (i = 12; i < 15; i++) {
-    if (inode.i_block[i] != 0)
-      indirect_block_summary(inode.i_block[i], inode_number, i + 1 - 12);
-  }
+  // Print indirect entries
+  if (inode.i_block[12] != 0)
+    indirect_block_summary(inode.i_block[12], inode_number, 1, 12);
+  if (inode.i_block[13] != 0)
+    indirect_block_summary(inode.i_block[13], inode_number, 2, 268);
+  if (inode.i_block[14] != 0)
+    indirect_block_summary(inode.i_block[14], inode_number, 3, 65804);
 }
 
+/* PRINTS ALL INODE ENTRIES (USED, UNUSED, DIRECTORY, INDIRECT)*/
 void inodes_summary(uint32_t group_number) {
   uint32_t num_chunks = inodes_per_group / 8;
   char chunks[num_chunks];
@@ -221,7 +234,7 @@ void inodes_summary(uint32_t group_number) {
   pread(img_fd, &chunks, num_chunks, 1024 + (group_descriptor.bg_inode_bitmap - 1)*blocks_size);
 
   uint32_t i, j;
-  char u_flags;
+  char u_flags; //contains flags, one bit for each block of data
   for (i = 0; i < num_chunks; i++) {
     u_flags = chunks[i];
     for (j = 0; j < 8; j++) {
@@ -244,6 +257,7 @@ void inodes_summary(uint32_t group_number) {
   }
 }
 
+/* RUN TO GET ALL OF THE ENTRIES FROM THE IMAGE */
 void process_group(uint32_t group_number) {
   group_summary(group_number);
   free_blocks_summary(group_number);

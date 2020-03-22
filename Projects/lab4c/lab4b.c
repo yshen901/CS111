@@ -12,6 +12,10 @@
 #include <ctype.h>
 #include <mraa.h>
 #include <getopt.h>
+#include <sys/socket.h>
+#include <ctype.h>
+#include <netdb.h>
+#include <netinet/in.h>
 
 #define R0 100000
 #define B 4275
@@ -22,6 +26,13 @@ FILE* log_file;
 int run_flag;
 int start_flag;
 char* std_input;
+char* id;
+int port;
+
+char* host;
+struct hostent* server;
+int sock_fd;
+struct sockaddr_in serv_addr;
 
 time_t last_timestamp;
 mraa_aio_context thermometer;
@@ -42,36 +53,36 @@ float read_temp() {
     return (temp_c * 9)/5 + 32;
   else
     return temp_c;
-}
+
 
 void handle_command(char c, int* i) {
   switch(c) {
   case 'F':
     scale = 'F';
     *i += 7;
-    log_str("SCALE=F\n");
+    log_str("SCALE=F\n", 0);
     break;
   case 'C':
     scale = 'C';
     *i += 7;
-    log_str("SCALE=C\n");
+    log_str("SCALE=C\n", 0);
     break;
   case 'S':
     if(start_flag == 1) {
       start_flag = 0;
       *i += 4;
     }
-    log_str("STOP\n");
+    log_str("STOP\n", 0);
     break;
   case 'G':
     if(start_flag == 0) {
       start_flag = 1;
       *i += 5; 
     }
-    log_str("START\n");
+    log_str("START\n", 0);
     break;
   case 'O':
-    log_str("OFF\n");
+    log_str("OFF\n", 0);
     button_func();
     break;
   default:
@@ -80,11 +91,12 @@ void handle_command(char c, int* i) {
 }
 
 /* STDIN PROCESSOR */
-void log_str(const char* mess) {
+void log_str(const char* mess, int print_server) {
+  if (print_server == 1)
+    dprintf(sock_fd, "%s", mess)
   if (log_file)
     fprintf(log_file, "%s", mess);
-  else
-    printf("%s", mess);
+  printf("%s", mess);
 }
 
 void process_input() {
@@ -114,10 +126,9 @@ void process_input() {
       if (isdigit(input_buff[i]))
 	period = atoi(&input_buff[i]);
 
-      if (log_file)
-	fprintf(log_file, "PERIOD=%c", input_buff[i]);
-      else
-	printf("PERIOD=%c", input_buff[i]);
+      char buff[64];
+      sprintf(buff, "PERIOD=%c", input_buff[i]);
+      log_str(buff, 0);
       
       /*end = i;
       valid = 1;
@@ -148,17 +159,15 @@ void print_time() {
 
   char current_time[10];
   strftime(current_time, 10, "%H:%M:%S", mytime);
-  printf("%s", current_time);
-  if(log_file)
-    fprintf(log_file, "%s", current_time);
+  log_str(buff, 1);
 }
 
 void print_temp() {
   int temp = (int)(10*read_temp());
 
-  printf(" %d.%d\n", temp/10, temp%10);
-  if(log_file)
-    fprintf(log_file, " %d.%d\n", temp/10, temp%10);
+  char buff [64];
+  sprintf(buff, " %d.%d\n", temp/10, temp%10);
+  log_str(buff, 1);
 }
 
 void print_timestamp() {
@@ -179,22 +188,22 @@ void print_timestamp() {
 /* FUNCTIONS FOR SYSTEM SHUTDOWN */
 void shutdown() { 
   print_time();
-  printf(" SHUTDOWN\n");
-  if(log_file)
-    fprintf(log_file, " SHUTDOWN\n");
+  log_str(" SHUTDOWN\n");
   exit(0);
 }
 
 void close_mraa() {
-  mraa_gpio_close(button);
+  // mraa_gpio_close(button);
   mraa_aio_close(thermometer);
 }
 
+/*
 void button_func() {
   run_flag = 0;
   start_flag = 0;
   shutdown();
 }
+*/
 
 /* HELPER FUNCTIONS FOR ERRORS */
 void syscall_error(const char* err_mess) {
@@ -225,6 +234,8 @@ int main (int argc, char** argv) {
     {"period", required_argument, 0, 'p'},
     {"scale", required_argument, 0, 's'},
     {"log", required_argument, 0, 'l'},
+    {"id", required_argument, 0, 'i'},
+    {"host", required_argument, 0, 'h'},
     {0, 0, 0, 0}
   };
 
@@ -245,24 +256,64 @@ int main (int argc, char** argv) {
       if (log_file == NULL)
 	syscall_error("ERROR opening/creating logfile\n");
       break;
+    case 'i':
+      id = optarg;
+      break;
+    case 'h':
+      host = optarg;
+      break;
     default:
       syscall_error("ERROR invalid option detected, please use --period, --scale, --log\n");
     }
   }
 
-  if ((thermometer = mraa_aio_init(1)) == NULL)
-    mraa_error("ERROR initializing thermometer\n");
+  if (optind < argc) {
+    port = atoi(argv[optind]);
+    if (port <= 0)
+      syscall_error("ERROR invalid port number, must be greater than 0\n");
+  }
 
-  
-  if ((button = mraa_gpio_init(60)) == NULL)
+  if (log_file == NULL)
+    syscall_error("ERROR log argument is missing\n");
+
+  if (port == NULL || id == NULL || host == NULL)
+    syscall_error("ERROR port, id, and host arguments are missing\n");
+
+  if (strlen(host) == 0)
+    syscall_error("ERROR host length must be greater than 0\n");
+
+  if (strlen(id) != 9)
+    syscall_error("ERROR id must be exactly 9 digits\n");
+
+  /*if ((button = mraa_gpio_init(60)) == NULL)
     mraa_error("ERROR initializing button");
   mraa_gpio_dir(button, MRAA_GPIO_IN);
-  mraa_gpio_isr(button, MRAA_GPIO_EDGE_RISING, &button_func, NULL);
-
+  mraa_gpio_isr(button, MRAA_GPIO_EDGE_RISING, &button_func, NULL);*/
+  
+  if ((thermometer = mraa_aio_init(1)) == NULL)
+    mraa_error("ERROR initializing thermometer\n");  
   atexit(close_mraa);
 
-  struct pollfd keyboard[] = {
-    {STDIN_FILENO, POLLIN, 0}
+  if ((server = gethostbyname(host)) == NULL)
+    syscall_error("ERROR finding host\n");
+  
+  if ((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    syscall_error("ERROR creating socket\n");
+
+  bzero((char*) &serv_addr, sizeof(serv_addr));
+  server.sin_family = AF_INET;
+  bcopy((char*) server->h_addr, (char*) &serv_addr.sin_addr.s_addr, server->h_length);
+  serv_addr.sin_port = htons(port_num);
+
+  if (connect(sock_fd, (struct sockaddr*) &serv_addr, sizeof(serv_addr)) < 0)
+    syscall_error("ERROR connecting to remote host\n");
+
+  char mess[64];
+  sprintf(mess, "ID=%s", id);
+  log_str(mess, 1);
+  
+  struct pollfd sock_poll[] = {
+    {sock_fd, POLLIN, 0}
   };
 
   if ((std_input = (char*) malloc(4096 * sizeof(char))) == NULL)
@@ -271,7 +322,7 @@ int main (int argc, char** argv) {
   int input = 0;
   while(run_flag) {
     print_timestamp();
-    input = poll(keyboard, 1, 0);
+    input = poll(sock_poll, 1, 0);
     if (input) 
       process_input();
   }

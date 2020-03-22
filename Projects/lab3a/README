@@ -1,0 +1,11 @@
+NAME: YUCI SHEN
+EMAIL: SHEN.YUCI11@GMAIL.COM
+UID: 604836772
+
+FILES
+-----
+lab3a.c	  ...   Analyzes an images and outputs CSV entries according to the spec
+Makefile  ...   Supports 3 options: build, dist, and clean
+ext2_fs.h ...   A Linux header file that defines the EXT2 file system.
+	  	Provided by the specification.
+README    ...   Contains descriptions for each of the files

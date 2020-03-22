@@ -1,0 +1,16 @@
+NAME: YUCI SHEN
+EMAIL: SHEN.YUCI11@GMAIL.COM
+ID: 604836772
+
+FILES
+-----
+lab3b.py - Python source file that supports a single argument, a csv file name,
+	   and analyzes the csv record to look for inconsistencies and errors
+	   in the file system
+
+lab3b.sh - A shell script that runs the python script with python and one
+	   argument. It is copied into lab3b to be tested
+
+Makefile - Supports default (builds executable file), dist, and clean
+
+README   - Contains descriptions of each of the files
