@@ -93,7 +93,7 @@ void handle_command(char c, int* i) {
 /* STDIN PROCESSOR */
 void log_str(const char* mess, int print_server) {
   if (print_server == 1)
-    dprintf(sock_fd, "%s", mess);
+    write(sock_fd, mess, strlen(mess));
   if (log_file)
     fprintf(log_file, "%s", mess);
   printf("%s", mess);
@@ -102,10 +102,9 @@ void log_str(const char* mess, int print_server) {
 void process_input() {
   char input_buff [4096];
   char log_buff[256];
-  int input_len = read(STDIN_FILENO, input_buff, 4096);
+  int input_len = read(sock_fd, input_buff, 4096);
   if (input_len == -1)
     syscall_error("ERROR reading input\n");
-
   input_buff[input_len] = '\0'; //AVOIDS OVERFLOW ISSUE 
   //int end, valid;
   int i;
@@ -117,8 +116,11 @@ void process_input() {
       handle_command('C', &i);
     else if(strncmp(input_buff+i, "STOP", 4) == 0)
       handle_command('S', &i);
-    else if (strncmp(input_buff+i, "START", 5) == 0)
+    else if (strncmp(input_buff+i, "START", 5) == 0){
+      //printf("STARTED\n");
       handle_command('G', &i);
+
+    }
     else if (strncmp(input_buff+i, "OFF", 3) == 0)
       handle_command('O', &i);
     else if (strncmp(input_buff+i, "PERIOD=",7) == 0) {
@@ -127,7 +129,7 @@ void process_input() {
 	period = atoi(&input_buff[i]);
 
       char buff[64];
-      sprintf(buff, "PERIOD=%c", input_buff[i]);
+      sprintf(buff, "PERIOD=%c\n", input_buff[i]);
       log_str(buff, 0);
       
       /*end = i;
@@ -146,7 +148,7 @@ void process_input() {
       }
       log_buff[j] = '\n';
       log_buff[j+1] = '\0';
-      log_str(log_buff, 1);
+      log_str(log_buff, 0);
     }
   } 
   return;  
@@ -163,10 +165,15 @@ void print_time() {
 }
 
 void print_temp() {
+  time_t now = time(NULL);
+  struct tm *mytime = localtime(&now);
+  char current_time[10];
+  strftime(current_time, 10, "%H:%M:%S", mytime);
+
   int temp = (int)(10*read_temp());
 
   char buff [64];
-  sprintf(buff, " %d.%d\n", temp/10, temp%10);
+  sprintf(buff, "%s %d.%d\n", current_time, temp/10, temp%10);
   log_str(buff, 1);
 }
 
@@ -178,20 +185,27 @@ void print_timestamp() {
   if(gettimeofday(&now, 0) < 0)
     syscall_error("ERROR getting current time\n");
   
-  if (now.tv_sec - last_timestamp < period) {
-    // printf("Currrent Time: %ld\nNext Time: %ld\n\n", (long)now, (long)last_timestamp);
+  if (now.tv_sec < last_timestamp) {
+    //printf("Currrent Time: %ld\n", (long)now.tv_sec);
     return;
   }
 
-  print_time();
+  //print_time();
   print_temp();
-  last_timestamp = now.tv_sec;
+  last_timestamp = now.tv_sec + period;
 }
 
 /* FUNCTIONS FOR SYSTEM SHUTDOWN*/
 void shutdown_func() { 
-  print_time();
-  log_str(" SHUTDOWN\n", 1);
+  time_t now = time(NULL);
+  struct tm *mytime = localtime(&now);
+  char current_time[10];
+  strftime(current_time, 10, "%H:%M:%S", mytime);
+
+  char buff [64];
+  sprintf(buff, "%s SHUTDOWN\n", current_time);
+
+  log_str(buff, 1);
   exit(0);
 }
 
@@ -314,9 +328,9 @@ int main (int argc, char** argv) {
   sprintf(mess, "ID=%s\n", id);
   log_str(mess, 1);
   
-  struct pollfd sock_poll[] = {
-    {sock_fd, POLLIN, 0}
-  };
+  struct pollfd sock_poll;
+  sock_poll.fd = sock_fd;
+  sock_poll.events = POLLIN;
 
   if ((std_input = (char*) malloc(4096 * sizeof(char))) == NULL)
     syscall_error("ERROR allocating memory for stdio\n");
@@ -324,9 +338,10 @@ int main (int argc, char** argv) {
   int input = 0;
   while(run_flag) {
     print_timestamp();
-    input = poll(sock_poll, 1, 0);
-    if (input) 
+    input = poll(&sock_poll, 1, 0);
+    if (input) {
       process_input();
+    }
   }
 
   return(0);
