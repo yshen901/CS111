@@ -27,7 +27,7 @@ int run_flag;
 int start_flag;
 char* std_input;
 char* id;
-int port;
+int port = -1;
 
 char* host;
 struct hostent* server;
@@ -53,7 +53,7 @@ float read_temp() {
     return (temp_c * 9)/5 + 32;
   else
     return temp_c;
-
+}
 
 void handle_command(char c, int* i) {
   switch(c) {
@@ -146,7 +146,7 @@ void process_input() {
       }
       log_buff[j] = '\n';
       log_buff[j+1] = '\0';
-      log_str(log_buff);
+      log_str(log_buff, 1);
     }
   } 
   return;  
@@ -276,7 +276,7 @@ int main (int argc, char** argv) {
   if (log_file == NULL)
     syscall_error("ERROR log argument is missing\n");
 
-  if (port == NULL || id == NULL || host == NULL)
+  if (port == -1 || host == NULL || id == NULL)
     syscall_error("ERROR port, id, and host arguments are missing\n");
 
   if (strlen(host) == 0)
@@ -301,9 +301,9 @@ int main (int argc, char** argv) {
     syscall_error("ERROR creating socket\n");
 
   bzero((char*) &serv_addr, sizeof(serv_addr));
-  server.sin_family = AF_INET;
+  serv_addr.sin_family = AF_INET;
   bcopy((char*) server->h_addr, (char*) &serv_addr.sin_addr.s_addr, server->h_length);
-  serv_addr.sin_port = htons(port_num);
+  serv_addr.sin_port = htons(port);
 
   if (connect(sock_fd, (struct sockaddr*) &serv_addr, sizeof(serv_addr)) < 0)
     syscall_error("ERROR connecting to remote host\n");
