@@ -185,8 +185,8 @@ void print_timestamp() {
   time(&last_timestamp);
 }
 
-/* FUNCTIONS FOR SYSTEM SHUTDOWN */
-void shutdown() { 
+/* FUNCTIONS FOR SYSTEM SHUTDOWN*/
+void shutdown_func() { 
   print_time();
   log_str(" SHUTDOWN\n", 1);
   exit(0);
@@ -197,13 +197,12 @@ void close_mraa() {
   mraa_aio_close(thermometer);
 }
 
-/*
+
 void button_func() {
   run_flag = 0;
   start_flag = 0;
-  shutdown();
+  shutdown_func();
 }
-*/
 
 /* HELPER FUNCTIONS FOR ERRORS */
 void syscall_error(const char* err_mess) {
