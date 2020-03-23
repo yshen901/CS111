@@ -10,7 +10,7 @@ SOURCES = lab4c_tcp.c lab4c_tls.c Makefile README smoketest.sh
 
 build:
 	@$(CC) $(CFLAGS) -o lab4c_tcp lab4c_tcp.c -lm -lmraa
-	@$(CC) $(CFLAGS) -i lab4c_tls lab4c_tls.c -lm -lmraa -lssl -lcrypto
+	@$(CC) $(CFLAGS) -o lab4c_tls lab4c_tls.c -lm -lmraa -lssl -lcrypto
 
 dist:
 	@tar -czvf $(ARCHIVE) $(SOURCES)

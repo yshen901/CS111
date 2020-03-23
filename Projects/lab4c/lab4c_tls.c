@@ -17,6 +17,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <openssl/ssl.h>
+#include <openssl/err.h>
 
 #define R0 100000
 #define B 4275
@@ -234,7 +235,7 @@ void syscall_error(const char* err_mess) {
   exit(1);
 }
 
-void syscall_error(const char* err_mess) {
+void syscall_error2(const char* err_mess) {
   fprintf(stderr, err_mess);
   exit(2);
 }
@@ -343,7 +344,7 @@ int main (int argc, char** argv) {
     syscall_error2("ERROR getting SSL context\n");
   if((ssl = SSL_new(ssl_context)) == NULL)
     syscall_error2("ERROR creating ssl\n");
-  if(SSL_set_fd(ss1, sock) == NULL)
+  if(SSL_set_fd(ssl, sock_fd) != 1)
     syscall_error2("ERROR adding file descrirptor to SSL\n");
   if(SSL_connect(ssl) <= 0)
     syscall_error2("ERROR connecting to ssl\n");
