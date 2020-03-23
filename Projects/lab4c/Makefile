@@ -15,8 +15,5 @@ build:
 dist:
 	@tar -czvf $(ARCHIVE) $(SOURCES)
 
-check:
-	@chmod +x smoketest.sh
-	./smoketest.sh
 clean:
 	@rm -f lab4c_tls lab4c_tcp log.txt $(ARCHIVE)

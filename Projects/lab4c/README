@@ -4,6 +4,7 @@ EMAIL: SHEN.YUCI11@GMAIL.COM
 
 File Description
 ----------------
-lab4b.c  ... Source code containing the embedded system software
-Makefile ... builds, creates the tarball dist, and cleans the files
-README   ... Describes the files in the system
+lab4c_tcp.c  ... Source code containing the TCP communication code
+lab4c_tls.c  ... Source code containing the TLS communication code
+Makefile     ... builds, creates the tarball dist, and cleans the files
+README       ... Describes the files in the system

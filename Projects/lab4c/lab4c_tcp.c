@@ -96,7 +96,7 @@ void log_str(const char* mess, int print_server) {
     write(sock_fd, mess, strlen(mess));
   if (log_file)
     fprintf(log_file, "%s", mess);
-  printf("%s", mess);
+  // printf("%s", mess);
 }
 
 void process_input() {

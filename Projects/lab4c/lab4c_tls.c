@@ -101,7 +101,7 @@ void log_str(const char* mess, int print_server) {
     
   if (log_file)
     fprintf(log_file, "%s", mess);
-  printf("%s", mess);
+  // printf("%s", mess);
 }
 
 void process_input() {
