@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# sanity check script for Project 4B
+# sanity check script for Project 4C
 #	extract tar file
 #	required README fields (ID, EMAIL, NAME)
 #	required Makefile targets (clean, dist, graphs, tests)
@@ -10,26 +10,22 @@
 #	make default, success, creates program
 #	unrecognized parameters
 #	recognizes standard parameters
-#	report generation
-#	command processing (direct input)
-#	command processing (pipe_test input)
-#	log generation
-#	use of expected functions
+#	retrieve TCP/TLS session logs
+#	    confirm successful identification
+#	    confirm successful completion
+#	    confirm server validation of all reports
 
 # Note: if you dummy up the sensor sampling
 #	this test script can be run on any
 #	Linux system.
 #
-LAB="lab4b"
+LAB="lab4c"
 README="README"
 MAKEFILE="Makefile"
 
-SOURCES=""
 EXPECTED=""
 EXPECTEDS=".c"
-PGM="lab4b"
-PGMS=$PGM
-TEST_PGM=pipe_test
+PGMS="lab4c_tcp lab4c_tls"
 
 SUFFIXES=""
 
@@ -40,6 +36,17 @@ EXIT_ARG=1
 EXIT_FAIL=1
 
 TIMEOUT=1
+
+SERVER="lever.cs.ucla.edu"
+BASE_URL="http://$SERVER"
+BASE_FILE="/var/spool/CS111_P4C"
+SERVERLOG="server.log"
+CLIENT_PFX="client_"
+CLIENT_SFX="log"
+TCP_PORT=18000
+TLS_PORT=19000
+
+MIN_REPORTS=15
 
 let errors=0
 
@@ -71,11 +78,6 @@ else
 		>&2 echo "FATAL: unable to pull test functions from $LIBRARY_URL"
 		exit -1
 	fi
-fi
-
-# get a copy of the input genartion programs
-if [ ! -s $TEST_PGM ]; then
-	downLoad $TEST_PGM $LIBRARY_URL "c" "-lpthread"
 fi
 
 # read the tarball into a test directory
@@ -210,107 +212,118 @@ do
 		echo "No Usage message to stderr for --bogus"
 		let errors+=1
 	else
-		echo -n "        "
+		echo -n "    "
 		cat STDERR
 	fi
 done
 
-
-# test the standard arguments
 echo
-p=2
-s="C"
-echo "... $PGM supports --scale, --period, --log"
-./$PGM --period=$p --scale=$s --log="LOGFILE" <<-EOF
-SCALE=F
-PERIOD=1
-START
-STOP
-LOG test
-OFF
-EOF
-ret=$?
-if [ $ret -ne 0 ]
-then
-	echo "RETURNS RC=$ret"
-	let errors+=1
+# figure out if we are testing with a local or remote server
+if [ -d "$BASE_FILE" ]; then
+	SERVER="localhost"
 fi
 
-if [ ! -s LOGFILE ]
-then
-	echo "did not create a log file"
-	let errors+=1
-else
-	echo "... $PGM supports and logs all sensor commands"
-	for c in SCALE=F PERIOD=1 START STOP OFF SHUTDOWN "LOG test"
+# check for successful session records
+for p in TCP TLS
+do
+	# figure out what the correct command is
+	if [ "$p" == "TCP" ]; then
+		PGM="./lab4c_tcp"
+		PORT=$TCP_PORT
+	else
+		PGM="./lab4c_tls"
+		PORT=$TLS_PORT
+	fi
+	echo "... running $p --id=$student session to $SERVER:$PORT (~1 minute)"
+	$PGM --id=$student --host=$SERVER --log=./LOG_$p $PORT
+
+	testRC $? $EXIT_OK
+	let errors+=$?
+
+	echo ... checking for logging of all commands and actions
+	for key in ID= START PERIOD= SCALE= STOP OFF SHUTDOWN
 	do
-		grep "$c" LOGFILE > /dev/null
-		if [ $? -ne 0 ]
-		then
-			echo "DID NOT LOG $c command"
+		grep $key LOG_$p > /dev/null
+		if [ $? -ne 0 ]; then
+			echo "ERROR: LOG_$p does not record $key"
 			let errors+=1
 		else
-			echo "    $c ... RECOGNIZED AND LOGGED"
+			echo "    logged $key ... OK"
 		fi
 	done
 
-	if [ $errors -gt 0 ]
-	then
-		echo "   LOG FILE DUMP FOLLOWS   "
-		cat LOGFILE
+	egrep '[0-9][0-9]:[0-9][0-9]:[0-9][0-9] [0-9]+\.[0-9]\>' LOG_$p > /dev/null
+	if [ $? -eq 0 ]; then
+		echo "    valid reports in log file ... OK"
+	else
+		echo "ERROR: no valid reports in log file"
+		let errors+=1
 	fi
-fi
 
-# test input from pipe_test
-echo
-echo "... $PGM correctly processes input from $TEST_PGM"
-../$TEST_PGM ./$PGM --period=$p --scale=$s --log="LOGFILE" > STDOUT 2> STDERR <<-EOF
-	PAUSE 2
-	SEND "SCALE=F\n"
-	SEND "PERIOD=1\n"
-	SEND "START\n"
-	PAUSE 2
-	SEND "STOP\n"
-	SEND "LOG test\n"
-	SEND "OFF\n"
-	CLOSE
-EOF
-
-if [ ! -s LOGFILE ]
-then
-	echo "did not create a log file"
-	let errors+=1
-else
-	for c in SCALE=F PERIOD=1 START STOP OFF SHUTDOWN "LOG test"
-	do
-		grep "$c" LOGFILE > /dev/null
-		if [ $? -ne 0 ]
-		then
-			echo "DID NOT LOG $c command"
-			let errors+=1
-		else
-			echo "    $c ... RECOGNIZED AND LOGGED"
-		fi
-	done
-
-	if [ $errors -gt 0 ]
-	then
-		echo "   LOG FILE DUMP FOLLOWS   "
-		cat LOGFILE
+	# retrieve the server log
+	rm -f $SERVERLOG
+	sfx="_SERVER"
+	if [ -d "$BASE_FILE/$p$sfx" ]; then
+		# local script testing
+		url="$BASE_FILE/$p$sfx"
+		cp $url/$SERVERLOG .
+		ok=$?
+	else
+		# standard testing is from remote server
+		url=$BASE_URL/$p$sfx
+		wget $url/$SERVERLOG 2> /dev/null
+		ok=$?
 	fi
-fi
 
-echo
-echo "... correct reporting format"
-egrep '[0-9][0-9]:[0-9][0-9]:[0-9][0-9] [0-9]+\.[0-9]\>' LOGFILE > FOUND
-if [ $? -eq 0 ] 
-then
-	echo "   " `cat FOUND` "... OK"
-else
-	echo NO VALID REPORTS IN LOGFILE:
-	let errors+=1
-	cat LOGFILE
-fi
+	if [ $ok -ne 0 ]; then
+		echo "ERROR: Unable to retrieve $SERVERLOG from $url"
+		let errors+=1
+		continue
+	else
+		echo "... retrieve $SERVERLOG from $url ... OK"
+	fi
+
+	# confirm session identification
+	grep "SESSION STARTED: ID=$student" $SERVERLOG > /dev/null
+	if [ $? -ne 0 ]; then
+		echo "ERROR: No successful $p session establishements found for $student".
+		echo "       Please check client-side and server-side logs to confirm that the"
+		echo "       first command sent to the server was (exactly) \"ID=$student\"".
+		let errors+=1
+		continue
+	else
+		echo "    confirm successful $p identification ... OK"
+	fi
+		
+	# confirm completion
+	grep "SESSION COMPLETED: ID=$student" $SERVERLOG > HITS
+	if [ $? -ne 0 ]; then
+		echo "ERROR: No successful $p session completions for $student"
+		let errors+=1
+		continue
+	else
+		echo "    confirm successful $p completion ... OK"
+	fi
+
+	# confirm a reasonable number of reports
+	rpts=`tail -n1 HITS | cut -f3 -d=`
+	tot=`echo $rpts | cut -f2 -d/`
+	if [ $tot -lt $MIN_REPORTS ]; then
+		echo "ERROR: only $tot $p reports received"
+		let errors+=1
+		continue
+	fi
+
+	good=`echo $rpts | cut -f1 -d/`
+	if [ $good -ne $tot ]; then
+	echo
+		echo "ERROR: only $good/$tot valid $p reports"
+		let errors+=1
+	else
+		echo "    good $p reports ... $good/$tot"
+	fi
+done
+
 
 #echo "... usage of expected library functions"
 #for r in sched_yield pthread_mutex_lock pthread_mutex_unlock __sync_lock_test_and_set __sync_lock_release
